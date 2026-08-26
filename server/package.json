@@ -1,0 +1,36 @@
+{
+  "name": "forma-ai-server",
+  "version": "1.0.0",
+  "description": "Backend API for Forma AI Dynamic Form Engine",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "dev": "nodemon server.js",
+    "start": "node server.js"
+  },
+  "keywords": [
+    "forma-ai",
+    "express",
+    "mongodb",
+    "langchain",
+    "react-hook-form"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@langchain/openai": "^0.6.11",
+    "bcryptjs": "^3.0.2",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.2",
+    "express": "^5.1.0",
+    "helmet": "^8.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "langchain": "^0.3.36",
+    "mongoose": "^8.18.0",
+    "morgan": "^1.10.1",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.10"
+  }
+}
