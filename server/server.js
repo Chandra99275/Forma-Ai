@@ -1,40 +1,16 @@
-import express from "express";
-import mongoose from "mongoose";
-import cors from "cors";
 import dotenv from "dotenv";
-import helmet from "helmet";
-import morgan from "morgan";
+import app from "./app.js";
+import connectDB from "./config/db.js";
 
+// Load environment variables
 dotenv.config();
 
-const app = express();
+// Connect MongoDB
+connectDB();
 
-// Middleware
-app.use(helmet());
-app.use(cors({
-  origin: process.env.CLIENT_URL,
-  credentials: true,
-}));
-app.use(morgan("dev"));
-app.use(express.json());
+const PORT = process.env.PORT || 5000;
 
-// Health Check Route
-app.get("/", (req, res) => {
-  res.json({
-    success: true,
-    message: "Forma AI Backend is Running 🚀",
-  });
+// Start Server
+app.listen(PORT, () => {
+  console.log(`🚀 Forma AI Server running on http://localhost:${PORT}`);
 });
-
-// MongoDB Connection
-mongoose
-  .connect(process.env.MONGO_URI)
-  .then(() => {
-    console.log("✅ MongoDB Connected");
-    app.listen(process.env.PORT, () => {
-      console.log(`🚀 Server running on http://localhost:${process.env.PORT}`);
-    });
-  })
-  .catch((err) => {
-    console.error("❌ MongoDB Connection Error:", err.message);
-  });
