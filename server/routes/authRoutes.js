@@ -1,12 +1,26 @@
 import express from "express";
 import { register, login } from "../controllers/authController.js";
+import authMiddleware from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-// Register a new user
-router.post("/register", register);
+// ===============================
+// Authentication Routes
+// ===============================
 
-// Login user
+// User Signup
+router.post("/signup", register);
+
+// User Login
 router.post("/login", login);
+
+// Get Logged-in User Profile (Protected Route)
+router.get("/profile", authMiddleware, (req, res) => {
+  res.status(200).json({
+    success: true,
+    message: "Profile fetched successfully.",
+    user: req.user,
+  });
+});
 
 export default router;
