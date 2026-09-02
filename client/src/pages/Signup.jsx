@@ -1,7 +1,8 @@
 import React, { useState } from "react";
 import "./signup.css";
-import axios from "axios";
 import { useNavigate, Link } from "react-router-dom";
+import { authApi } from "../api";
+import { useAuthStore } from "../store";
 import {
   FaUser,
   FaEnvelope,
@@ -17,6 +18,7 @@ import {
 
 const Signup = () => {
   const navigate = useNavigate();
+  const setAuth = useAuthStore((state) => state.setAuth);
 
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -108,21 +110,21 @@ const Signup = () => {
     try {
       setLoading(true);
 
-      const response = await axios.post(
-        "http://localhost:5000/api/auth/signup",
-        {
-          fullName: formData.fullName,
-          email: formData.email,
-          mobile: formData.mobile,
-          password: formData.password,
-        }
-      );
+      const data = await authApi.register({
+        fullName: formData.fullName,
+        email: formData.email,
+        mobile: formData.mobile,
+        password: formData.password,
+      });
 
       // Save JWT Token
-      localStorage.setItem("token", response.data.token);
+      localStorage.setItem("token", data.token);
 
       // Save User
-      localStorage.setItem("user", JSON.stringify(response.data.user));
+      localStorage.setItem("user", JSON.stringify(data.user));
+
+      // Update Zustand Auth Store
+      setAuth(data.user, data.token);
 
       // Success Popup
       setPopup({

@@ -7,7 +7,17 @@ const apiClient = axios.create({
   },
 });
 
-// Future JWT interceptor can be added here
-// apiClient.interceptors.request.use((config) => { ... });
+apiClient.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem("token");
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
 
 export default apiClient;
