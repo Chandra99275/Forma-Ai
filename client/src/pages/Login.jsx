@@ -1,7 +1,8 @@
 import React, { useState } from "react";
 import "./login.css";
-import axios from "axios";
 import { Link, useNavigate } from "react-router-dom";
+import { authApi } from "../api";
+import { useAuthStore } from "../store";
 import {
   FaEnvelope,
   FaLock,
@@ -15,6 +16,7 @@ import {
 
 const Login = () => {
   const navigate = useNavigate();
+  const setAuth = useAuthStore((state) => state.setAuth);
 
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -62,16 +64,15 @@ const Login = () => {
     try {
       setLoading(true);
 
-      const response = await axios.post(
-        "http://localhost:5000/api/auth/login",
-        {
-          email: loginData.email,
-          password: loginData.password,
-        }
-      );
+      const data = await authApi.login({
+        email: loginData.email,
+        password: loginData.password,
+      });
 
-      localStorage.setItem("token", response.data.token);
-      localStorage.setItem("user", JSON.stringify(response.data.user));
+      localStorage.setItem("token", data.token);
+      localStorage.setItem("user", JSON.stringify(data.user));
+
+      setAuth(data.user, data.token);
 
       setPopup({
         show: true,
@@ -85,11 +86,14 @@ const Login = () => {
       }, 1500);
 
     } catch (err) {
+      const backendMessage =
+        err.response?.data?.message ||
+        "Invalid email or password. Please check your credentials and try again.";
+
       setPopup({
         show: true,
         title: "Login Failed",
-        message:
-          "Invalid email or password. Please check your credentials and try again.",
+        message: backendMessage,
         type: "error",
       });
     } finally {
