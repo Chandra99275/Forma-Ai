@@ -1,0 +1,1966 @@
+/* ==========================================
+   FORMA AI - AI PARSER CSS (PART 1)
+   Premium AI Assistant UI
+========================================== */
+
+@import url("https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap");
+
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+}
+
+body{
+    font-family:"Poppins",sans-serif;
+    background:#f5f8ff;
+    color:#1e293b;
+}
+
+.aiParserPage{
+    min-height:100vh;
+    padding:30px;
+    background:linear-gradient(180deg,#f8fbff,#eef5ff);
+}
+
+/* ==========================================
+   HERO SECTION
+========================================== */
+
+.aiHero{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:40px;
+    padding:50px;
+    border-radius:30px;
+    background:linear-gradient(135deg,#2563EB,#4F46E5,#7C3AED);
+    color:white;
+    box-shadow:0 20px 45px rgba(79,70,229,.28);
+}
+
+.aiHeroLeft{
+    flex:1;
+}
+
+.aiHeroBadge{
+    display:inline-flex;
+    align-items:center;
+    gap:10px;
+    padding:10px 20px;
+    border-radius:30px;
+    background:rgba(255,255,255,.18);
+    border:1px solid rgba(255,255,255,.3);
+    backdrop-filter:blur(12px);
+    margin-bottom:25px;
+    font-size:14px;
+}
+
+.aiHeroLeft h1{
+    font-size:46px;
+    margin-bottom:20px;
+    line-height:1.2;
+}
+
+.aiHeroLeft p{
+    color:#dbeafe;
+    font-size:16px;
+    line-height:1.8;
+    max-width:600px;
+}
+
+.heroButtons{
+    display:flex;
+    gap:18px;
+    margin-top:28px;
+    flex-wrap:wrap;
+}
+
+.aiPrimaryBtn,
+.aiSecondaryBtn{
+    padding:15px 24px;
+    border-radius:14px;
+    border:none;
+    cursor:pointer;
+    font-weight:600;
+    display:flex;
+    align-items:center;
+    gap:10px;
+    transition:.3s;
+}
+
+.aiPrimaryBtn{
+    background:white;
+    color:#2563EB;
+}
+
+.aiPrimaryBtn:hover{
+    transform:translateY(-4px);
+}
+
+.aiSecondaryBtn{
+    background:rgba(255,255,255,.15);
+    color:white;
+    border:1px solid rgba(255,255,255,.25);
+}
+
+.aiSecondaryBtn:hover{
+    background:rgba(255,255,255,.25);
+}
+
+/* ==========================================
+   HERO STATS
+========================================== */
+
+.aiHeroRight{
+    width:360px;
+    display:grid;
+    grid-template-columns:repeat(2,1fr);
+    gap:18px;
+}
+
+.aiStatCard{
+    padding:22px;
+    border-radius:18px;
+    background:rgba(255,255,255,.15);
+    backdrop-filter:blur(14px);
+    border:1px solid rgba(255,255,255,.2);
+    display:flex;
+    gap:15px;
+    align-items:center;
+    transition:.3s;
+}
+
+.aiStatCard:hover{
+    transform:translateY(-6px);
+}
+
+.aiStatCard svg{
+    font-size:28px;
+}
+
+.aiStatCard h2{
+    font-size:24px;
+}
+
+.aiStatCard span{
+    font-size:12px;
+    color:#E0F2FE;
+}
+
+/* ==========================================
+   SECTION TITLE
+========================================== */
+
+.aiSectionTitle{
+    margin:40px 0 25px;
+}
+
+.aiSectionTitle h2{
+    color:#1E3A8A;
+    font-size:30px;
+    margin-bottom:10px;
+}
+
+.aiSectionTitle p{
+    color:#64748B;
+    font-size:15px;
+}
+
+/* ==========================================
+   AI PROMPT CARD
+========================================== */
+
+.promptCard{
+    background:white;
+    padding:30px;
+    border-radius:24px;
+    box-shadow:0 12px 30px rgba(15,23,42,.08);
+    margin-bottom:35px;
+}
+
+.promptHeader{
+    display:flex;
+    align-items:center;
+    gap:15px;
+    margin-bottom:18px;
+}
+
+.promptHeader svg{
+    color:#2563EB;
+    font-size:28px;
+}
+
+.promptHeader h3{
+    color:#1E3A8A;
+    font-size:24px;
+}
+
+.promptCard textarea{
+    width:100%;
+    border-radius:18px;
+    border:1px solid #CBD5E1;
+    padding:20px;
+    resize:none;
+    font-size:15px;
+    outline:none;
+    background:#F8FBFF;
+    transition:.3s;
+}
+
+.promptCard textarea:focus{
+    border-color:#2563EB;
+    box-shadow:0 0 0 4px rgba(37,99,235,.12);
+}
+
+/* Voice Button */
+
+.voiceButton{
+    margin-top:18px;
+    display:inline-flex;
+    align-items:center;
+    gap:10px;
+    padding:12px 20px;
+    background:#EEF2FF;
+    border:none;
+    color:#4F46E5;
+    border-radius:12px;
+    cursor:pointer;
+    font-weight:600;
+}
+
+.voiceButton:hover{
+    background:#DBEAFE;
+}
+
+/* Parse Button */
+
+.parseButton{
+    margin-top:22px;
+    padding:16px 28px;
+    border:none;
+    border-radius:14px;
+    cursor:pointer;
+    background:linear-gradient(135deg,#2563EB,#7C3AED);
+    color:white;
+    display:flex;
+    align-items:center;
+    gap:10px;
+    font-size:15px;
+    font-weight:600;
+    transition:.3s;
+}
+
+.parseButton:hover{
+    transform:translateY(-3px);
+    box-shadow:0 15px 25px rgba(79,70,229,.28);
+}
+
+/* ==========================================
+   QUICK PROMPTS
+========================================== */
+
+.quickPromptGrid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+    gap:18px;
+    margin-top:30px;
+}
+
+.quickPromptCard{
+    background:#EFF6FF;
+    border:1px solid #BFDBFE;
+    padding:18px;
+    border-radius:16px;
+    cursor:pointer;
+    transition:.3s;
+}
+
+.quickPromptCard:hover{
+    background:#DBEAFE;
+    transform:translateY(-4px);
+}
+
+.quickPromptCard h4{
+    color:#1D4ED8;
+    margin-bottom:8px;
+}
+
+.quickPromptCard p{
+    color:#475569;
+    font-size:13px;
+    line-height:1.5;
+}
+
+/* ==========================================
+   UPLOAD SECTION
+========================================== */
+
+.uploadSection{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(320px,1fr));
+    gap:25px;
+}
+
+.uploadCard{
+    background:white;
+    padding:28px;
+    border-radius:22px;
+    box-shadow:0 10px 25px rgba(15,23,42,.07);
+}
+
+.uploadHeader{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    margin-bottom:20px;
+}
+
+.uploadHeader svg{
+    font-size:28px;
+    color:#2563EB;
+}
+
+.uploadHeader h3{
+    color:#1E3A8A;
+}
+
+.uploadBox{
+    border:2px dashed #93C5FD;
+    background:#EFF6FF;
+    border-radius:20px;
+    padding:35px;
+    text-align:center;
+    transition:.3s;
+    cursor:pointer;
+}
+
+.uploadBox:hover{
+    background:#DBEAFE;
+    border-color:#2563EB;
+}
+
+.uploadBox svg{
+    font-size:55px;
+    color:#2563EB;
+    margin-bottom:18px;
+}
+
+.uploadBox h4{
+    margin-bottom:8px;
+    color:#1E3A8A;
+}
+
+.uploadBox p{
+    color:#64748B;
+    font-size:14px;
+}
+
+.uploadBtn{
+    margin-top:20px;
+    padding:12px 20px;
+    border:none;
+    background:#2563EB;
+    color:white;
+    border-radius:12px;
+    cursor:pointer;
+    font-weight:600;
+}
+/* ==========================================
+   FORMA AI AI PARSER CSS - PART 2
+   OCR + AI Processing + Confidence Meter
+========================================== */
+
+/* ==========================================
+   IMAGE PREVIEW GRID
+========================================== */
+
+.imagePreviewSection{
+    margin-top:30px;
+}
+
+.imagePreviewSection h3{
+    color:#1E3A8A;
+    margin-bottom:18px;
+}
+
+.previewGrid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill,minmax(170px,1fr));
+    gap:20px;
+}
+
+.previewCard{
+    position:relative;
+    border-radius:18px;
+    overflow:hidden;
+    background:white;
+    box-shadow:0 10px 25px rgba(15,23,42,.08);
+    transition:.3s;
+}
+
+.previewCard:hover{
+    transform:translateY(-6px);
+}
+
+.previewCard img{
+    width:100%;
+    height:170px;
+    object-fit:cover;
+}
+
+.previewOverlay{
+    position:absolute;
+    bottom:0;
+    left:0;
+    right:0;
+    padding:12px;
+    background:linear-gradient(to top,rgba(0,0,0,.65),transparent);
+    color:white;
+    font-size:13px;
+}
+
+.removeImage{
+    position:absolute;
+    top:10px;
+    right:10px;
+    width:34px;
+    height:34px;
+    border-radius:50%;
+    border:none;
+    background:#EF4444;
+    color:white;
+    cursor:pointer;
+}
+
+/* ==========================================
+   PDF PREVIEW LIST
+========================================== */
+
+.pdfSection{
+    margin-top:35px;
+}
+
+.pdfSection h3{
+    color:#1E3A8A;
+    margin-bottom:18px;
+}
+
+.pdfList{
+    display:flex;
+    flex-direction:column;
+    gap:16px;
+}
+
+.pdfCard{
+    background:white;
+    border:1px solid #E2E8F0;
+    border-radius:16px;
+    padding:18px 20px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    transition:.3s;
+}
+
+.pdfCard:hover{
+    border-color:#2563EB;
+    box-shadow:0 10px 25px rgba(37,99,235,.08);
+}
+
+.pdfInfo{
+    display:flex;
+    align-items:center;
+    gap:15px;
+}
+
+.pdfInfo svg{
+    color:#EF4444;
+    font-size:34px;
+}
+
+.pdfInfo h4{
+    color:#1E3A8A;
+    margin-bottom:4px;
+}
+
+.pdfInfo span{
+    font-size:13px;
+    color:#64748B;
+}
+
+.pdfDelete{
+    width:36px;
+    height:36px;
+    border:none;
+    border-radius:50%;
+    background:#FEE2E2;
+    color:#DC2626;
+    cursor:pointer;
+}
+
+/* ==========================================
+   AI PROCESSING CARD
+========================================== */
+
+.processingCard{
+    margin-top:45px;
+    background:white;
+    border-radius:24px;
+    padding:35px;
+    box-shadow:0 15px 35px rgba(15,23,42,.08);
+}
+
+.processingHeader{
+    display:flex;
+    align-items:center;
+    gap:15px;
+    margin-bottom:28px;
+}
+
+.processingHeader svg{
+    color:#7C3AED;
+    font-size:30px;
+}
+
+.processingHeader h2{
+    color:#312E81;
+}
+
+.processingLoader{
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    padding:35px;
+}
+
+.aiSpinner{
+    width:70px;
+    height:70px;
+    border-radius:50%;
+    border:6px solid #EDE9FE;
+    border-top-color:#7C3AED;
+    animation:spin 1s linear infinite;
+}
+
+/* ==========================================
+   AI TIMELINE
+========================================== */
+
+.timeline{
+    margin-top:30px;
+    display:flex;
+    flex-direction:column;
+    gap:22px;
+}
+
+.timelineItem{
+    display:flex;
+    gap:18px;
+    align-items:flex-start;
+}
+
+.timelineIcon{
+    width:48px;
+    height:48px;
+    border-radius:50%;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    background:#EEF2FF;
+    color:#4F46E5;
+    font-size:20px;
+}
+
+.timelineContent h4{
+    color:#1E3A8A;
+    margin-bottom:5px;
+}
+
+.timelineContent p{
+    color:#64748B;
+    font-size:14px;
+    line-height:1.6;
+}
+
+.timelineDone .timelineIcon{
+    background:#DCFCE7;
+    color:#16A34A;
+}
+
+/* ==========================================
+   CONFIDENCE SCORE
+========================================== */
+
+.confidenceWrapper{
+    margin-top:45px;
+    display:grid;
+    grid-template-columns:320px 1fr;
+    gap:30px;
+    align-items:center;
+}
+
+.confidenceCard{
+    background:white;
+    border-radius:24px;
+    padding:30px;
+    text-align:center;
+    box-shadow:0 12px 30px rgba(15,23,42,.08);
+}
+
+.confidenceCircle{
+    width:180px;
+    height:180px;
+    margin:auto;
+    border-radius:50%;
+    background:conic-gradient(
+        #22C55E 0deg,
+        #22C55E 349deg,
+        #E5E7EB 349deg
+    );
+    display:flex;
+    justify-content:center;
+    align-items:center;
+}
+
+.confidenceInner{
+    width:140px;
+    height:140px;
+    border-radius:50%;
+    background:white;
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+    align-items:center;
+}
+
+.confidenceInner h1{
+    color:#16A34A;
+    font-size:38px;
+}
+
+.confidenceInner span{
+    color:#64748B;
+    font-size:13px;
+}
+
+.confidenceCard p{
+    margin-top:20px;
+    color:#64748B;
+    line-height:1.7;
+}
+
+/* Confidence Breakdown */
+
+.confidenceDetails{
+    background:white;
+    border-radius:24px;
+    padding:30px;
+    box-shadow:0 12px 30px rgba(15,23,42,.08);
+}
+
+.confidenceDetails h3{
+    color:#1E3A8A;
+    margin-bottom:25px;
+}
+
+.confidenceItem{
+    margin-bottom:22px;
+}
+
+.confidenceItem label{
+    display:flex;
+    justify-content:space-between;
+    margin-bottom:8px;
+    color:#334155;
+    font-size:14px;
+}
+
+.progressBar{
+    width:100%;
+    height:10px;
+    border-radius:20px;
+    background:#E2E8F0;
+    overflow:hidden;
+}
+
+.progressFill{
+    height:100%;
+    border-radius:20px;
+    background:linear-gradient(90deg,#2563EB,#4F46E5);
+}
+
+/* ==========================================
+   OCR RESULT SECTION
+========================================== */
+
+.ocrCard{
+    margin-top:45px;
+    background:white;
+    border-radius:24px;
+    padding:32px;
+    box-shadow:0 12px 30px rgba(15,23,42,.08);
+}
+
+.ocrHeader{
+    display:flex;
+    align-items:center;
+    gap:15px;
+    margin-bottom:24px;
+}
+
+.ocrHeader svg{
+    color:#2563EB;
+    font-size:28px;
+}
+
+.ocrHeader h2{
+    color:#1E3A8A;
+}
+
+.ocrGrid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+    gap:20px;
+}
+
+.ocrItem{
+    background:#F8FBFF;
+    border:1px solid #DBEAFE;
+    border-radius:16px;
+    padding:18px;
+    transition:.3s;
+}
+
+.ocrItem:hover{
+    border-color:#60A5FA;
+}
+
+.ocrItem span{
+    font-size:12px;
+    color:#64748B;
+}
+
+.ocrItem h4{
+    margin-top:8px;
+    color:#1D4ED8;
+    font-size:16px;
+}
+
+/* ==========================================
+   DOCUMENT SUMMARY CARD
+========================================== */
+
+.summaryCard{
+    margin-top:40px;
+    background:white;
+    border-radius:24px;
+    padding:30px;
+    box-shadow:0 12px 30px rgba(15,23,42,.08);
+}
+
+.summaryHeader{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    margin-bottom:22px;
+}
+
+.summaryHeader svg{
+    color:#2563EB;
+    font-size:26px;
+}
+
+.summaryHeader h2{
+    color:#1E3A8A;
+}
+
+.summaryContent{
+    background:#EFF6FF;
+    border-radius:16px;
+    padding:22px;
+    color:#475569;
+    line-height:1.8;
+}
+
+/* ==========================================
+   PARSED FIELD GRID
+========================================== */
+
+.parsedFields{
+    margin-top:30px;
+}
+
+.fieldGrid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(230px,1fr));
+    gap:18px;
+}
+
+.fieldCard{
+    background:white;
+    border-radius:16px;
+    padding:20px;
+    border:1px solid #DBEAFE;
+    transition:.3s;
+}
+
+.fieldCard:hover{
+    border-color:#2563EB;
+    transform:translateY(-4px);
+}
+
+.fieldCard span{
+    font-size:12px;
+    color:#64748B;
+}
+
+.fieldCard h4{
+    margin-top:8px;
+    color:#1E3A8A;
+}
+
+/* ==========================================
+   AI SMART SUGGESTIONS
+========================================== */
+
+.aiSuggestionCard{
+    margin-top:45px;
+    background:linear-gradient(180deg,#FFFFFF,#F8FBFF);
+    border-radius:24px;
+    padding:30px;
+    border:1px solid #E0E7FF;
+    box-shadow:0 12px 30px rgba(15,23,42,.08);
+}
+
+.aiSuggestionCard h2{
+    color:#312E81;
+    margin-bottom:22px;
+}
+
+.suggestionList{
+    display:flex;
+    flex-direction:column;
+    gap:16px;
+}
+
+.suggestionItem{
+    display:flex;
+    gap:15px;
+    align-items:flex-start;
+    padding:16px;
+    border-radius:14px;
+    background:#EEF2FF;
+    color:#4338CA;
+    transition:.3s;
+}
+
+.suggestionItem:hover{
+    background:#E0E7FF;
+}
+
+.suggestionItem svg{
+    font-size:20px;
+    color:#22C55E;
+}
+
+/* ==========================================
+   ACTION BUTTONS
+========================================== */
+
+.actionButtons{
+    display:flex;
+    justify-content:flex-end;
+    gap:18px;
+    margin-top:35px;
+    flex-wrap:wrap;
+}
+
+.clearBtn,
+.editBtn,
+.generateBtn{
+    padding:14px 24px;
+    border:none;
+    border-radius:14px;
+    cursor:pointer;
+    display:flex;
+    align-items:center;
+    gap:10px;
+    font-weight:600;
+    transition:.3s;
+}
+
+.clearBtn{
+    background:#FEE2E2;
+    color:#DC2626;
+}
+
+.editBtn{
+    background:#DBEAFE;
+    color:#1D4ED8;
+}
+
+.generateBtn{
+    background:linear-gradient(135deg,#2563EB,#7C3AED);
+    color:white;
+}
+
+.generateBtn:hover,
+.editBtn:hover,
+.clearBtn:hover{
+    transform:translateY(-3px);
+}
+
+/* ==========================================
+   AI STATUS BADGES
+========================================== */
+
+.statusBadge{
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    padding:8px 14px;
+    border-radius:20px;
+    font-size:13px;
+    font-weight:600;
+}
+
+.successBadge{
+    background:#DCFCE7;
+    color:#15803D;
+}
+
+.warningBadge{
+    background:#FEF3C7;
+    color:#B45309;
+}
+
+.infoBadge{
+    background:#DBEAFE;
+    color:#1D4ED8;
+}
+/* ==========================================
+   FORMA AI AI PARSER CSS - PART 3
+   AI Chat + Insights Dashboard
+========================================== */
+
+/* ==========================================
+   AI CHAT SECTION
+========================================== */
+
+.aiChatSection{
+    margin-top:45px;
+    background:#fff;
+    border-radius:24px;
+    padding:30px;
+    box-shadow:0 12px 30px rgba(15,23,42,.08);
+}
+
+.chatHeader{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    margin-bottom:25px;
+}
+
+.chatHeader h2{
+    color:#1E3A8A;
+    font-size:28px;
+}
+
+.chatHeader span{
+    padding:8px 14px;
+    border-radius:20px;
+    background:#DCFCE7;
+    color:#15803D;
+    font-size:13px;
+    font-weight:600;
+}
+
+.chatContainer{
+    display:flex;
+    flex-direction:column;
+    gap:18px;
+    max-height:420px;
+    overflow-y:auto;
+    padding-right:10px;
+}
+
+/* Chat Bubble */
+
+.botMessage,
+.userMessage{
+    display:flex;
+    gap:14px;
+    align-items:flex-start;
+}
+
+.botAvatar,
+.userAvatar{
+    width:44px;
+    height:44px;
+    border-radius:50%;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    color:#fff;
+    font-size:20px;
+    flex-shrink:0;
+}
+
+.botAvatar{
+    background:linear-gradient(135deg,#2563EB,#7C3AED);
+}
+
+.userAvatar{
+    background:#0EA5E9;
+}
+
+.botBubble,
+.userBubble{
+    max-width:75%;
+    padding:16px 18px;
+    border-radius:18px;
+    line-height:1.7;
+    font-size:14px;
+}
+
+.botBubble{
+    background:#F8FBFF;
+    border:1px solid #DBEAFE;
+    color:#334155;
+}
+
+.userBubble{
+    background:#2563EB;
+    color:#fff;
+}
+
+.chatInputBox{
+    display:flex;
+    align-items:center;
+    gap:14px;
+    margin-top:25px;
+    border:1px solid #CBD5E1;
+    border-radius:18px;
+    padding:10px 14px;
+    background:#fff;
+}
+
+.chatInputBox input{
+    flex:1;
+    border:none;
+    outline:none;
+    font-size:15px;
+    font-family:Poppins,sans-serif;
+}
+
+.chatInputBox button{
+    width:46px;
+    height:46px;
+    border:none;
+    border-radius:14px;
+    background:linear-gradient(135deg,#2563EB,#7C3AED);
+    color:white;
+    cursor:pointer;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    font-size:18px;
+}
+
+/* ==========================================
+   INSURANCE TYPE CARDS
+========================================== */
+
+.insuranceTypeSection{
+    margin-top:50px;
+}
+
+.insuranceGrid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+    gap:22px;
+}
+
+.insuranceCard{
+    background:#fff;
+    border-radius:22px;
+    padding:24px;
+    text-align:center;
+    border:2px solid #E2E8F0;
+    cursor:pointer;
+    transition:.3s;
+    box-shadow:0 8px 20px rgba(15,23,42,.05);
+}
+
+.insuranceCard:hover{
+    transform:translateY(-8px);
+    border-color:#2563EB;
+}
+
+.insuranceCard.active{
+    border-color:#2563EB;
+    background:linear-gradient(180deg,#EFF6FF,#DBEAFE);
+}
+
+.insuranceCard svg{
+    font-size:42px;
+    color:#2563EB;
+    margin-bottom:18px;
+}
+
+.insuranceCard h3{
+    color:#1E3A8A;
+    margin-bottom:10px;
+}
+
+.insuranceCard p{
+    font-size:13px;
+    color:#64748B;
+    line-height:1.6;
+}
+
+/* ==========================================
+   DRAG DROP AREA
+========================================== */
+
+.dragDropSection{
+    margin-top:45px;
+}
+
+.dragDropCard{
+    background:#fff;
+    padding:35px;
+    border-radius:24px;
+    box-shadow:0 12px 30px rgba(15,23,42,.08);
+}
+
+.dragZone{
+    border:3px dashed #93C5FD;
+    background:linear-gradient(180deg,#F8FBFF,#EFF6FF);
+    border-radius:22px;
+    padding:50px;
+    text-align:center;
+    transition:.3s;
+}
+
+.dragZone:hover{
+    border-color:#2563EB;
+    background:#DBEAFE;
+}
+
+.dragZone svg{
+    font-size:65px;
+    color:#2563EB;
+    margin-bottom:18px;
+}
+
+.dragZone h3{
+    color:#1E3A8A;
+    margin-bottom:8px;
+}
+
+.dragZone p{
+    color:#64748B;
+    margin-bottom:20px;
+}
+
+.dragZone button{
+    padding:12px 24px;
+    border:none;
+    border-radius:12px;
+    background:#2563EB;
+    color:#fff;
+    cursor:pointer;
+    font-weight:600;
+}
+
+/* ==========================================
+   DOCUMENT VERIFICATION
+========================================== */
+
+.verificationSection{
+    margin-top:50px;
+}
+
+.verificationGrid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
+    gap:20px;
+}
+
+.verifyCard{
+    background:#fff;
+    border-radius:20px;
+    padding:24px;
+    border:1px solid #E2E8F0;
+    transition:.3s;
+}
+
+.verifyCard:hover{
+    transform:translateY(-5px);
+    border-color:#2563EB;
+}
+
+.verifyCardTop{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:18px;
+}
+
+.verifyCardTop svg{
+    font-size:30px;
+    color:#2563EB;
+}
+
+.verifyStatus{
+    padding:6px 12px;
+    border-radius:20px;
+    font-size:12px;
+    font-weight:600;
+}
+
+.verifyStatus.success{
+    background:#DCFCE7;
+    color:#15803D;
+}
+
+.verifyStatus.pending{
+    background:#FEF3C7;
+    color:#B45309;
+}
+
+.verifyCard h4{
+    color:#1E3A8A;
+    margin-bottom:8px;
+}
+
+.verifyCard p{
+    color:#64748B;
+    font-size:13px;
+    line-height:1.6;
+}
+
+/* ==========================================
+   AI INSIGHTS DASHBOARD
+========================================== */
+
+.insightSection{
+    margin-top:55px;
+}
+
+.insightGrid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(230px,1fr));
+    gap:22px;
+}
+
+.insightCard{
+    background:white;
+    border-radius:22px;
+    padding:25px;
+    box-shadow:0 10px 25px rgba(15,23,42,.08);
+    transition:.3s;
+}
+
+.insightCard:hover{
+    transform:translateY(-6px);
+}
+
+.insightCard svg{
+    font-size:34px;
+    color:#4F46E5;
+    margin-bottom:18px;
+}
+
+.insightCard h2{
+    color:#1E3A8A;
+    font-size:32px;
+    margin-bottom:8px;
+}
+
+.insightCard span{
+    color:#64748B;
+    font-size:14px;
+}
+
+/* ==========================================
+   CLAIM COMPLETION PROGRESS
+========================================== */
+
+.claimProgressCard{
+    margin-top:45px;
+    background:white;
+    border-radius:24px;
+    padding:30px;
+    box-shadow:0 12px 30px rgba(15,23,42,.08);
+}
+
+.claimProgressCard h2{
+    color:#1E3A8A;
+    margin-bottom:25px;
+}
+
+.progressItem{
+    margin-bottom:22px;
+}
+
+.progressItem label{
+    display:flex;
+    justify-content:space-between;
+    margin-bottom:8px;
+    color:#334155;
+    font-size:14px;
+}
+
+.progressTrack{
+    width:100%;
+    height:12px;
+    border-radius:20px;
+    background:#E2E8F0;
+    overflow:hidden;
+}
+
+.progressTrackFill{
+    height:100%;
+    border-radius:20px;
+    background:linear-gradient(90deg,#2563EB,#4F46E5);
+}
+
+/* ==========================================
+   SMART RECOMMENDATIONS
+========================================== */
+
+.recommendSection{
+    margin-top:55px;
+}
+
+.recommendGrid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(260px,1fr));
+    gap:22px;
+}
+
+.recommendCard{
+    background:linear-gradient(180deg,#FFFFFF,#F8FBFF);
+    border-radius:20px;
+    padding:24px;
+    border:1px solid #DBEAFE;
+    transition:.3s;
+}
+
+.recommendCard:hover{
+    transform:translateY(-5px);
+    border-color:#60A5FA;
+}
+
+.recommendCard svg{
+    font-size:30px;
+    color:#16A34A;
+    margin-bottom:16px;
+}
+
+.recommendCard h3{
+    color:#1E3A8A;
+    margin-bottom:10px;
+}
+
+.recommendCard p{
+    color:#64748B;
+    font-size:14px;
+    line-height:1.7;
+}
+
+/* ==========================================
+   AI TAGS
+========================================== */
+
+.aiTags{
+    display:flex;
+    gap:12px;
+    flex-wrap:wrap;
+    margin-top:25px;
+}
+
+.aiTag{
+    padding:8px 14px;
+    border-radius:20px;
+    background:#EEF2FF;
+    color:#4338CA;
+    font-size:13px;
+    font-weight:600;
+}
+
+/* ==========================================
+   DOCUMENT METADATA
+========================================== */
+
+.metadataCard{
+    margin-top:40px;
+    background:#fff;
+    border-radius:24px;
+    padding:30px;
+    box-shadow:0 10px 25px rgba(15,23,42,.08);
+}
+
+.metadataGrid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+    gap:18px;
+}
+
+.metadataItem{
+    background:#EFF6FF;
+    padding:18px;
+    border-radius:14px;
+}
+
+.metadataItem span{
+    color:#64748B;
+    font-size:12px;
+}
+
+.metadataItem h4{
+    margin-top:8px;
+    color:#1E3A8A;
+}
+/* ==========================================
+   FORMA AI AI PARSER CSS - PART 4
+   Responsive + Animations + Final Polish
+========================================== */
+
+/* ==========================================
+   GLASSMORPHISM CARDS
+========================================== */
+
+.glassCard{
+    background:rgba(255,255,255,.65);
+    backdrop-filter:blur(18px);
+    border:1px solid rgba(255,255,255,.35);
+    border-radius:24px;
+}
+
+.glassCard:hover{
+    box-shadow:0 15px 35px rgba(37,99,235,.15);
+}
+
+/* ==========================================
+   FEATURE SECTION
+========================================== */
+
+.aiFeatureSection{
+    margin-top:60px;
+}
+
+.featureGrid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+    gap:24px;
+}
+
+.featureCard{
+    background:white;
+    padding:28px;
+    border-radius:22px;
+    text-align:center;
+    box-shadow:0 10px 25px rgba(15,23,42,.08);
+    transition:.3s ease;
+}
+
+.featureCard:hover{
+    transform:translateY(-8px);
+    box-shadow:0 18px 35px rgba(37,99,235,.18);
+}
+
+.featureCard svg{
+    font-size:42px;
+    color:#2563EB;
+    margin-bottom:18px;
+}
+
+.featureCard h3{
+    color:#1E3A8A;
+    margin-bottom:12px;
+}
+
+.featureCard p{
+    color:#64748B;
+    font-size:14px;
+    line-height:1.6;
+}
+
+/* ==========================================
+   SECURITY BANNER
+========================================== */
+
+.securityBanner{
+    margin-top:60px;
+    padding:35px;
+    border-radius:24px;
+    background:linear-gradient(135deg,#0F172A,#1E3A8A,#2563EB);
+    color:white;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:30px;
+    box-shadow:0 15px 35px rgba(15,23,42,.25);
+}
+
+.securityBanner h2{
+    font-size:30px;
+    margin-bottom:10px;
+}
+
+.securityBanner p{
+    color:#CBD5E1;
+    line-height:1.7;
+}
+
+.securityBanner svg{
+    font-size:70px;
+    color:#60A5FA;
+}
+
+/* ==========================================
+   AI INFO CARDS
+========================================== */
+
+.infoCards{
+    margin-top:50px;
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(250px,1fr));
+    gap:22px;
+}
+
+.infoCard{
+    background:white;
+    padding:25px;
+    border-radius:20px;
+    box-shadow:0 10px 25px rgba(15,23,42,.08);
+    border-left:5px solid #2563EB;
+    transition:.3s;
+}
+
+.infoCard:hover{
+    transform:translateY(-5px);
+}
+
+.infoCard h4{
+    color:#1E3A8A;
+    margin-bottom:10px;
+}
+
+.infoCard p{
+    color:#64748B;
+    line-height:1.7;
+    font-size:14px;
+}
+
+/* ==========================================
+   FLOATING AI BADGES
+========================================== */
+
+.aiBadgeGroup{
+    display:flex;
+    flex-wrap:wrap;
+    gap:12px;
+    margin-top:20px;
+}
+
+.aiBadge{
+    padding:10px 16px;
+    border-radius:25px;
+    background:#EEF2FF;
+    color:#4338CA;
+    font-weight:600;
+    font-size:13px;
+    transition:.3s;
+}
+
+.aiBadge:hover{
+    background:#C7D2FE;
+}
+
+/* ==========================================
+   ALERT BOXES
+========================================== */
+
+.alertBox{
+    margin-top:25px;
+    padding:18px 22px;
+    border-radius:16px;
+    display:flex;
+    align-items:center;
+    gap:14px;
+}
+
+.alertBox svg{
+    font-size:22px;
+}
+
+.alertSuccess{
+    background:#DCFCE7;
+    color:#15803D;
+}
+
+.alertWarning{
+    background:#FEF3C7;
+    color:#B45309;
+}
+
+.alertInfo{
+    background:#DBEAFE;
+    color:#1D4ED8;
+}
+
+/* ==========================================
+   BUTTON EFFECTS
+========================================== */
+
+.aiPrimaryBtn,
+.aiSecondaryBtn,
+.parseButton,
+.uploadBtn,
+.generateBtn,
+.voiceButton{
+    transition:all .3s ease;
+}
+
+.aiPrimaryBtn:hover,
+.aiSecondaryBtn:hover,
+.uploadBtn:hover,
+.voiceButton:hover,
+.generateBtn:hover,
+.parseButton:hover{
+    transform:translateY(-3px);
+    box-shadow:0 10px 25px rgba(79,70,229,.22);
+}
+
+/* ==========================================
+   INPUT EFFECTS
+========================================== */
+
+textarea,
+input,
+select{
+    transition:all .25s ease;
+}
+
+textarea:hover,
+input:hover,
+select:hover{
+    border-color:#60A5FA;
+}
+
+/* ==========================================
+   CUSTOM SCROLLBAR
+========================================== */
+
+::-webkit-scrollbar{
+    width:10px;
+}
+
+::-webkit-scrollbar-track{
+    background:#EFF6FF;
+}
+
+::-webkit-scrollbar-thumb{
+    background:linear-gradient(#2563EB,#7C3AED);
+    border-radius:20px;
+}
+
+::-webkit-scrollbar-thumb:hover{
+    background:#1D4ED8;
+}
+
+/* ==========================================
+   ANIMATIONS
+========================================== */
+
+@keyframes fadeUp{
+    from{
+        opacity:0;
+        transform:translateY(30px);
+    }
+    to{
+        opacity:1;
+        transform:translateY(0);
+    }
+}
+
+@keyframes floatCard{
+    0%{
+        transform:translateY(0px);
+    }
+    50%{
+        transform:translateY(-8px);
+    }
+    100%{
+        transform:translateY(0px);
+    }
+}
+
+@keyframes pulseGlow{
+    0%{
+        box-shadow:0 0 0 rgba(37,99,235,.15);
+    }
+    50%{
+        box-shadow:0 0 25px rgba(37,99,235,.3);
+    }
+    100%{
+        box-shadow:0 0 0 rgba(37,99,235,.15);
+    }
+}
+
+@keyframes spin{
+    from{
+        transform:rotate(0deg);
+    }
+    to{
+        transform:rotate(360deg);
+    }
+}
+
+/* Fade Animation */
+
+.aiHero,
+.promptCard,
+.uploadCard,
+.processingCard,
+.confidenceCard,
+.ocrCard,
+.summaryCard,
+.aiSuggestionCard,
+.featureCard,
+.infoCard{
+    animation:fadeUp .6s ease;
+}
+
+/* Floating Stats */
+
+.aiStatCard:nth-child(1){
+    animation:floatCard 5s infinite ease-in-out;
+}
+.aiStatCard:nth-child(2){
+    animation:floatCard 6s infinite ease-in-out;
+}
+.aiStatCard:nth-child(3){
+    animation:floatCard 4.5s infinite ease-in-out;
+}
+.aiStatCard:nth-child(4){
+    animation:floatCard 5.5s infinite ease-in-out;
+}
+
+/* Glow Main Buttons */
+
+.parseButton,
+.generateBtn{
+    animation:pulseGlow 3s infinite ease;
+}
+
+/* ==========================================
+   RESPONSIVE DESIGN
+========================================== */
+
+/* Laptop */
+
+@media(max-width:1100px){
+
+    .aiHero{
+        flex-direction:column;
+        text-align:center;
+    }
+
+    .aiHeroLeft p{
+        margin:auto;
+    }
+
+    .heroButtons{
+        justify-content:center;
+    }
+
+    .aiHeroRight{
+        width:100%;
+        grid-template-columns:repeat(2,1fr);
+    }
+
+    .confidenceWrapper{
+        grid-template-columns:1fr;
+    }
+
+    .securityBanner{
+        flex-direction:column;
+        text-align:center;
+    }
+
+}
+
+/* Tablet */
+
+@media(max-width:768px){
+
+    .aiParserPage{
+        padding:20px;
+    }
+
+    .aiHero{
+        padding:35px 25px;
+    }
+
+    .aiHeroLeft h1{
+        font-size:34px;
+    }
+
+    .aiHeroRight{
+        grid-template-columns:1fr;
+    }
+
+    .uploadSection,
+    .featureGrid,
+    .verificationGrid,
+    .insuranceGrid,
+    .recommendGrid,
+    .infoCards,
+    .ocrGrid,
+    .fieldGrid,
+    .metadataGrid{
+        grid-template-columns:1fr;
+    }
+
+    .chatInputBox{
+        flex-direction:column;
+        align-items:stretch;
+    }
+
+    .chatInputBox button{
+        width:100%;
+    }
+
+    .actionButtons{
+        flex-direction:column;
+    }
+
+    .actionButtons button{
+        width:100%;
+        justify-content:center;
+    }
+
+}
+
+/* Mobile */
+
+@media(max-width:480px){
+
+    .aiParserPage{
+        padding:14px;
+    }
+
+    .aiHero{
+        border-radius:22px;
+        padding:28px 18px;
+    }
+
+    .aiHeroBadge{
+        font-size:12px;
+    }
+
+    .aiHeroLeft h1{
+        font-size:28px;
+    }
+
+    .aiHeroLeft p{
+        font-size:14px;
+    }
+
+    .promptCard,
+    .processingCard,
+    .ocrCard,
+    .summaryCard,
+    .confidenceCard,
+    .confidenceDetails,
+    .aiSuggestionCard{
+        padding:22px;
+    }
+
+    .confidenceCircle{
+        width:150px;
+        height:150px;
+    }
+
+    .confidenceInner{
+        width:115px;
+        height:115px;
+    }
+
+    .confidenceInner h1{
+        font-size:30px;
+    }
+
+    .botBubble,
+    .userBubble{
+        max-width:100%;
+    }
+
+    .previewGrid{
+        grid-template-columns:repeat(2,1fr);
+    }
+
+    .featureCard{
+        padding:22px;
+    }
+
+    .securityBanner h2{
+        font-size:24px;
+    }
+
+    .securityBanner svg{
+        font-size:55px;
+    }
+
+}
+
+/* ==========================================
+   PREMIUM UTILITIES
+========================================== */
+
+.shadowBlue{
+    box-shadow:0 15px 35px rgba(37,99,235,.15);
+}
+
+.shadowPurple{
+    box-shadow:0 15px 35px rgba(124,58,237,.18);
+}
+
+.roundedXL{
+    border-radius:24px;
+}
+
+.textGradient{
+    background:linear-gradient(90deg,#2563EB,#7C3AED);
+    -webkit-background-clip:text;
+    -webkit-text-fill-color:transparent;
+}
+
+.center{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+}
+
+.spaceBetween{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+}
+
+.mt20{margin-top:20px;}
+.mt30{margin-top:30px;}
+.mt40{margin-top:40px;}
+.mb20{margin-bottom:20px;}
+.mb30{margin-bottom:30px;}
+
+/* ==========================================
+   END OF AI PARSER CSS
+========================================== */

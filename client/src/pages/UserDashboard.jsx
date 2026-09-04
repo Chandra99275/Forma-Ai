@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { Link, NavLink } from "react-router-dom";
 import "./dashboard.css";
 
 import {
@@ -13,6 +14,13 @@ import {
   FaSearch,
   FaArrowUp,
   FaArrowRight,
+  FaHeartbeat,
+  FaCarCrash,
+  FaHome,
+  FaPlaneDeparture,
+  FaCog,
+  FaClipboardList,
+  FaChartPie,
 } from "react-icons/fa";
 
 const UserDashboard = () => {
@@ -43,8 +51,17 @@ const UserDashboard = () => {
 
         <ul className="sidebar-menu">
           <li className="active">Dashboard</li>
-          <li>AI Parser</li>
-          <li>Dynamic Forms</li>
+           <li><Link to="/ai-parser">AI Parser</Link></li>
+          <li>
+  <NavLink
+    to="/dynamic-forms"
+    className={({ isActive }) =>
+      isActive ? "sidebar-link active" : "sidebar-link"
+    }
+  >
+    Dynamic Forms
+  </NavLink>
+</li>
           <li>Analytics</li>
           <li>Submissions</li>
           <li>Profile</li>

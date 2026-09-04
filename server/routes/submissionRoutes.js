@@ -1,21 +1,48 @@
 import express from "express";
+
 import {
   saveDraft,
   submitForm,
   getSubmissions,
+  getSubmissionById,
+  updateSubmissionStatus,
+  deleteSubmission,
 } from "../controllers/submissionController.js";
 
-import authMiddleware from "../middleware/authMiddleware.js";
+import { protect } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-// Save draft
-router.post("/draft", authMiddleware, saveDraft);
+/* ==========================================
+   USER ROUTES
+========================================== */
 
-// Submit completed form
-router.post("/submit", authMiddleware, submitForm);
+// Save Draft
+// POST /api/submissions/draft
+router.post("/draft", protect, saveDraft);
 
-// Get logged-in user's submissions
-router.get("/", authMiddleware, getSubmissions);
+// Submit Completed Form
+// POST /api/submissions/submit
+router.post("/submit", protect, submitForm);
+
+// Get Logged-in User Submissions
+// GET /api/submissions
+router.get("/", protect, getSubmissions);
+
+// Get Single Submission
+// GET /api/submissions/:id
+router.get("/:id", protect, getSubmissionById);
+
+/* ==========================================
+   UPDATE & DELETE SUBMISSIONS
+========================================== */
+
+// Update Submission Status
+// PUT /api/submissions/:id
+router.put("/:id", protect, updateSubmissionStatus);
+
+// Delete Submission
+// DELETE /api/submissions/:id
+router.delete("/:id", protect, deleteSubmission);
 
 export default router;

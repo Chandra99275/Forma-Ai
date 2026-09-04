@@ -2,9 +2,9 @@ import User from "../models/User.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 
-// ===============================
-// Generate JWT Token
-// ===============================
+/* ==========================================
+   Generate JWT Token
+========================================== */
 const generateToken = (id) => {
   return jwt.sign(
     { id },
@@ -15,14 +15,15 @@ const generateToken = (id) => {
   );
 };
 
-// ===============================
-// Register User (Signup)
-// ===============================
-export const register = async (req, res) => {
+/* ==========================================
+   Register User (Signup)
+   POST /api/auth/register
+========================================== */
+export const registerUser = async (req, res) => {
   try {
     const { fullName, email, mobile, password } = req.body;
 
-    // Check required fields
+    // Validate Input
     if (!fullName || !email || !mobile || !password) {
       return res.status(400).json({
         success: false,
@@ -30,28 +31,28 @@ export const register = async (req, res) => {
       });
     }
 
-    // Check if email already exists
-    const userExists = await User.findOne({ email });
+    // Check Existing User
+    const existingUser = await User.findOne({ email });
 
-    if (userExists) {
+    if (existingUser) {
       return res.status(400).json({
         success: false,
         message: "User already exists with this email.",
       });
     }
 
-    // Hash password
+    // Hash Password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Create new user
+    // Create User
     const user = await User.create({
       fullName,
       email,
       mobile,
       password: hashedPassword,
+      role: "user",
     });
 
-    // Response
     res.status(201).json({
       success: true,
       message: "Registration successful.",
@@ -69,19 +70,20 @@ export const register = async (req, res) => {
 
     res.status(500).json({
       success: false,
-      message: "Server Error",
+      message: "Internal Server Error",
     });
   }
 };
 
-// ===============================
-// Login User
-// ===============================
-export const login = async (req, res) => {
+/* ==========================================
+   Login User
+   POST /api/auth/login
+========================================== */
+export const loginUser = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    // Check email and password
+    // Validate Input
     if (!email || !password) {
       return res.status(400).json({
         success: false,
@@ -89,7 +91,7 @@ export const login = async (req, res) => {
       });
     }
 
-    // Find user
+    // Find User
     const user = await User.findOne({ email });
 
     if (!user) {
@@ -99,17 +101,17 @@ export const login = async (req, res) => {
       });
     }
 
-    // Compare password
-    const match = await bcrypt.compare(password, user.password);
+    // Compare Password
+    const isMatch = await bcrypt.compare(password, user.password);
 
-    if (!match) {
+    if (!isMatch) {
       return res.status(401).json({
         success: false,
-        message: "Invalid credentials.",
+        message: "Invalid email or password.",
       });
     }
 
-    // Login response
+    // Login Success
     res.status(200).json({
       success: true,
       message: "Login successful.",
@@ -127,7 +129,80 @@ export const login = async (req, res) => {
 
     res.status(500).json({
       success: false,
-      message: "Server Error",
+      message: "Internal Server Error",
+    });
+  }
+};
+
+/* ==========================================
+   Get Logged-in User Profile
+   GET /api/auth/profile
+========================================== */
+export const getProfile = async (req, res) => {
+  try {
+    res.status(200).json({
+      success: true,
+      user: {
+        id: req.user._id,
+        fullName: req.user.fullName,
+        email: req.user.email,
+        mobile: req.user.mobile,
+        role: req.user.role,
+      },
+    });
+  } catch (error) {
+    console.error("Profile Error:", error.message);
+
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch profile.",
+    });
+  }
+};
+
+/* ==========================================
+   Update Logged-in User Profile
+   PUT /api/auth/profile
+========================================== */
+export const updateProfile = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found.",
+      });
+    }
+
+    user.fullName = req.body.fullName || user.fullName;
+    user.mobile = req.body.mobile || user.mobile;
+
+    // Update Password if Provided
+    if (req.body.password && req.body.password.trim() !== "") {
+      user.password = await bcrypt.hash(req.body.password, 10);
+    }
+
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Profile updated successfully.",
+      token: generateToken(user._id),
+      user: {
+        id: user._id,
+        fullName: user.fullName,
+        email: user.email,
+        mobile: user.mobile,
+        role: user.role,
+      },
+    });
+  } catch (error) {
+    console.error("Update Profile Error:", error.message);
+
+    res.status(500).json({
+      success: false,
+      message: "Failed to update profile.",
     });
   }
 };

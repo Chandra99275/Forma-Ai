@@ -12,99 +12,144 @@ import {
   FaCheckCircle,
   FaUsers,
   FaClock,
+  FaHeartbeat,
+  FaCarCrash,
+  FaHome,
+  FaPlaneDeparture,
+  FaUserShield,
+  FaBuilding,
+  FaMagic,
+  FaFileMedical,
+  FaLock,
+  FaGlobe,
 } from "react-icons/fa";
 
 const Home = () => {
   return (
     <div className="home">
 
-      {/* ================= NAVBAR ================= */}
+      {/* ================= PREMIUM NAVBAR ================= */}
 
       <nav className="navbar">
+
         <div className="logo">
+          <FaRobot className="logo-icon" />
           <span>Forma</span>AI
         </div>
 
         <ul className="nav-links">
           <li>Home</li>
           <li>Features</li>
-          <li>Workflow</li>
+          <li>Insurance Forms</li>
+          <li>AI Parser</li>
           <li>Analytics</li>
           <li>Contact</li>
         </ul>
 
         <div className="nav-buttons">
-  <Link to="/login" className="login-btn">
-    Login
-  </Link>
+          <Link to="/login" className="login-btn">
+            Login
+          </Link>
 
-  <Link to="/signup" className="signup-btn">
-    Sign Up
-  </Link>
-</div>
+          <Link to="/signup" className="signup-btn">
+            Get Started
+          </Link>
+        </div>
+
       </nav>
 
-      {/* ================= HERO ================= */}
+      {/* ================= HERO SECTION ================= */}
 
       <section className="hero">
+
+        {/* Left Content */}
 
         <div className="hero-left">
 
           <div className="tag">
-            AI-Augmented Dynamic Form Engine
+            ✨ AI-Augmented Dynamic Form Engine
           </div>
 
           <h1>
-            Intelligent Insurance Forms Powered by
+            Automate Insurance Claims with
             <span> Artificial Intelligence</span>
           </h1>
 
           <p>
-            Forma AI automatically extracts information from insurance
-            documents, pre-fills dynamic forms, validates responses,
-            and simplifies workflow automation for InsurTech companies.
+            Forma AI is a next-generation InsurTech platform that reads insurance
+            documents, extracts policy information using AI, generates dynamic
+            forms, validates responses, and submits claims faster than ever.
           </p>
 
           <div className="hero-buttons">
-            <button className="primary-btn">
-              Get Started
-            </button>
 
-            <button className="secondary-btn">
-              Learn More
-            </button>
+            <Link to="/signup" className="primary-btn">
+              Start Free
+            </Link>
+
+            <Link to="/ai-parser" className="secondary-btn">
+              Try AI Parser
+            </Link>
+
           </div>
 
           <div className="hero-users">
+
             <FaUsers />
-            <span>Trusted by 350+ organizations</span>
+
+            <span>Trusted by 350+ Insurance Agencies & Organizations</span>
+
+          </div>
+
+          <div className="hero-features">
+
+            <div>
+              <FaCheckCircle />
+              AI OCR Extraction
+            </div>
+
+            <div>
+              <FaCheckCircle />
+              Dynamic Smart Forms
+            </div>
+
+            <div>
+              <FaCheckCircle />
+              Secure Claim Processing
+            </div>
+
           </div>
 
         </div>
+
+        {/* Right AI Preview */}
 
         <div className="hero-right">
 
           <div className="glass-card">
 
             <div className="ai-header">
+
               <FaRobot className="robot-icon" />
+
               <div>
-                <h3>AI Document Parser</h3>
-                <p>Reading Policy.pdf</p>
+                <h3>AI Insurance Parser</h3>
+                <p>Reading VehicleClaim.pdf</p>
               </div>
+
             </div>
 
             <div className="progress">
               <div className="progress-fill"></div>
             </div>
 
-            <small>Confidence Score • 97%</small>
+            <small>AI Confidence • 97%</small>
 
             <div className="ai-fields">
 
               <div className="field">
-                <span>Name</span>
-                <strong>John Anderson</strong>
+                <span>Claim Type</span>
+                <strong>Vehicle Accident</strong>
               </div>
 
               <div className="field">
@@ -113,16 +158,21 @@ const Home = () => {
               </div>
 
               <div className="field">
-                <span>Date of Birth</span>
-                <strong>08 Jan 1998</strong>
+                <span>Claim Amount</span>
+                <strong>₹48,500</strong>
               </div>
 
               <div className="field">
                 <span>Status</span>
-                <strong className="success">Validated</strong>
+                <strong className="success">Verified</strong>
               </div>
 
             </div>
+
+            <button className="parse-btn">
+              <FaMagic />
+              Parse Complete
+            </button>
 
           </div>
 
@@ -136,12 +186,12 @@ const Home = () => {
 
         <div className="stat-card">
           <h2>25K+</h2>
-          <p>Forms Generated</p>
+          <p>Insurance Forms Generated</p>
         </div>
 
         <div className="stat-card">
           <h2>96%</h2>
-          <p>AI Accuracy</p>
+          <p>AI Parsing Accuracy</p>
         </div>
 
         <div className="stat-card">
@@ -151,231 +201,120 @@ const Home = () => {
 
         <div className="stat-card">
           <h2>350+</h2>
-          <p>Organizations</p>
+          <p>Insurance Organizations</p>
         </div>
 
       </section>
 
-      {/* ================= FEATURES ================= */}
+      {/* ================= INSURANCE CATEGORIES ================= */}
 
-      <section className="features">
+      <section className="insurance-categories">
 
         <div className="section-title">
-          <h2>Powerful AI Features</h2>
+          <h2>Insurance Forms Supported</h2>
+
           <p>
-            Everything you need to automate insurance form processing.
+            AI-powered dynamic forms for multiple insurance categories.
           </p>
         </div>
 
-        <div className="feature-grid">
+        <div className="category-grid">
 
-          <div className="feature-card">
-            <FaFileUpload className="feature-icon" />
-            <h3>Smart Upload</h3>
-            <p>
-              Upload PDF, PNG, JPG, scanned insurance documents securely.
-            </p>
-          </div>
+          <Link to="/dynamic-forms" className="category-card health">
 
-          <div className="feature-card">
-            <FaBrain className="feature-icon" />
-            <h3>AI Auto Fill</h3>
-            <p>
-              Gemini AI extracts names, IDs, addresses, and policy details.
-            </p>
-          </div>
+            <FaHeartbeat className="category-icon" />
 
-          <div className="feature-card">
-            <FaShieldAlt className="feature-icon" />
-            <h3>Dynamic Validation</h3>
-            <p>
-              Detect missing information and validate fields intelligently.
-            </p>
-          </div>
+            <h3>Health Insurance</h3>
 
-          <div className="feature-card">
-            <FaChartLine className="feature-icon" />
-            <h3>Analytics Dashboard</h3>
             <p>
-              Visualize completion rates and AI parsing performance.
+              Medical reimbursement, hospitalization claims, OPD claims, critical
+              illness, family health insurance.
             </p>
-          </div>
 
-          <div className="feature-card">
-            <FaClock className="feature-icon" />
-            <h3>Workflow Automation</h3>
-            <p>
-              Reduce manual work and process forms in seconds.
-            </p>
-          </div>
+            <span>20+ Dynamic Fields →</span>
 
-          <div className="feature-card">
-            <FaCheckCircle className="feature-icon" />
-            <h3>Conditional Forms</h3>
+          </Link>
+
+          <Link to="/dynamic-forms" className="category-card vehicle">
+
+            <FaCarCrash className="category-icon" />
+
+            <h3>Vehicle Insurance</h3>
+
             <p>
-              Display questions dynamically based on previous answers.
+              Car accident claims, bike insurance, windshield damage, theft,
+              third-party claims.
             </p>
-          </div>
+
+            <span>25+ AI Questions →</span>
+
+          </Link>
+
+          <Link to="/dynamic-forms" className="category-card property">
+
+            <FaHome className="category-icon" />
+
+            <h3>Property Insurance</h3>
+
+            <p>
+              Fire damage, flood claims, home theft, building insurance,
+              commercial property.
+            </p>
+
+            <span>18+ Conditional Questions →</span>
+
+          </Link>
+
+          <Link to="/dynamic-forms" className="category-card travel">
+
+            <FaPlaneDeparture className="category-icon" />
+
+            <h3>Travel Insurance</h3>
+
+            <p>
+              Flight cancellation, baggage loss, medical emergencies, visa claim
+              insurance.
+            </p>
+
+            <span>15+ Smart Sections →</span>
+
+          </Link>
+
+          <Link to="/dynamic-forms" className="category-card life">
+
+            <FaUserShield className="category-icon" />
+
+            <h3>Life Insurance</h3>
+
+            <p>
+              Death claims, nominee verification, maturity settlement, term
+              insurance.
+            </p>
+
+            <span>AI Document Validation →</span>
+
+          </Link>
+
+          <Link to="/dynamic-forms" className="category-card business">
+
+            <FaBuilding className="category-icon" />
+
+            <h3>Business Insurance</h3>
+
+            <p>
+              Employee insurance, equipment damage, business interruption, cyber
+              insurance.
+            </p>
+
+            <span>Enterprise Workflow →</span>
+
+          </Link>
 
         </div>
 
       </section>
 
-      {/* ================= WORKFLOW ================= */}
-
-      <section className="workflow">
-
-        <div className="section-title">
-          <h2>How Forma AI Works</h2>
-          <p>Simple AI-powered workflow for insurance automation.</p>
-        </div>
-
-        <div className="workflow-container">
-
-          <div className="workflow-card">
-            <div className="step-number">1</div>
-            <h3>Upload Document</h3>
-            <p>Upload policy, claim, or customer insurance documents.</p>
-          </div>
-
-          <div className="workflow-card">
-            <div className="step-number">2</div>
-            <h3>AI Processing</h3>
-            <p>AI extracts structured information from uploaded files.</p>
-          </div>
-
-          <div className="workflow-card">
-            <div className="step-number">3</div>
-            <h3>Review Dynamic Form</h3>
-            <p>Review auto-filled fields and edit if required.</p>
-          </div>
-
-          <div className="workflow-card">
-            <div className="step-number">4</div>
-            <h3>Validate & Submit</h3>
-            <p>Submit verified forms with confidence scoring.</p>
-          </div>
-
-        </div>
-
-      </section>
-
-      {/* ================= WHY FORMA AI ================= */}
-
-      <section className="why-forma">
-
-        <div className="why-left">
-
-          <h2>Why Choose Forma AI?</h2>
-
-          <p>
-            Forma AI combines Artificial Intelligence with Dynamic Form Rendering
-            to reduce paperwork and improve insurance workflows.
-          </p>
-
-          <div className="why-list">
-
-            <div className="why-item">
-              <FaCheckCircle />
-              <span>AI Powered Document Parsing</span>
-            </div>
-
-            <div className="why-item">
-              <FaCheckCircle />
-              <span>Dynamic Multi-Step Forms</span>
-            </div>
-
-            <div className="why-item">
-              <FaCheckCircle />
-              <span>Real-Time Validation Engine</span>
-            </div>
-
-            <div className="why-item">
-              <FaCheckCircle />
-              <span>Fast & Secure Workflow Automation</span>
-            </div>
-
-          </div>
-
-        </div>
-
-        <div className="why-right">
-
-          <div className="dashboard-preview">
-
-            <h3>AI Insights</h3>
-
-            <div className="mini-chart">
-              <div className="bar one"></div>
-              <div className="bar two"></div>
-              <div className="bar three"></div>
-              <div className="bar four"></div>
-            </div>
-
-            <div className="insight">
-              <span>Completion Rate</span>
-              <strong>96%</strong>
-            </div>
-
-            <div className="insight">
-              <span>Documents Processed</span>
-              <strong>12,481</strong>
-            </div>
-
-            <div className="insight">
-              <span>AI Suggestions Accepted</span>
-              <strong>89%</strong>
-            </div>
-
-          </div>
-
-        </div>
-
-      </section>
-
-      {/* ================= CTA ================= */}
-
-      <section className="cta">
-
-        <h2>Experience Intelligent Form Automation</h2>
-
-        <p>
-          Join organizations using Forma AI to automate insurance document
-          processing with AI-powered dynamic forms.
-        </p>
-
-        <button className="cta-btn">
-          Launch Forma AI
-          <FaArrowRight />
-        </button>
-
-      </section>
-
-      {/* ================= FOOTER ================= */}
-
-      <footer className="footer">
-
-        <div className="footer-logo">
-          <span>Forma</span>AI
-        </div>
-
-        <p>
-          AI-Augmented Dynamic Form Engine for InsurTech & Workflow Automation.
-        </p>
-
-        <div className="footer-links">
-          <a href="/">Home</a>
-          <a href="/">Features</a>
-          <a href="/">Privacy</a>
-          <a href="/">Support</a>
-        </div>
-
-        <small>
-          © 2026 Forma AI | Developed by Team Forma AI • MLRIT
-        </small>
-
-      </footer>
-
+      {/* Continue in Part 2 */}
     </div>
   );
 };
