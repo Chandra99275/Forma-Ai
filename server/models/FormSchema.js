@@ -115,6 +115,31 @@ const formSchema = new mongoose.Schema(
 
     description: String,
 
+    /*
+     * Schema version number.
+     *
+     * Version starts from 1 and can be increased whenever
+     * the structure of a form is changed.
+     */
+    version: {
+      type: Number,
+      default: 1,
+      min: 1,
+    },
+
+    /*
+     * Current lifecycle state of the form schema.
+     *
+     * draft     -> still being edited
+     * published -> available for users
+     * archived  -> no longer active
+     */
+    status: {
+      type: String,
+      enum: ["draft", "published", "archived"],
+      default: "draft",
+    },
+
     questions: [questionSchema],
   },
   {
