@@ -140,6 +140,15 @@ const formSchema = new mongoose.Schema(
       default: "draft",
     },
 
+    /*
+ * Short note describing what changed in this version.
+ */
+    versionNote: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+  
     questions: [questionSchema],
   },
   {
