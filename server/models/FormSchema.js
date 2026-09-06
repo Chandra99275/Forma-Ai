@@ -124,7 +124,11 @@ const formSchema = new mongoose.Schema(
     version: {
       type: Number,
       default: 1,
-      min: 1,
+      min: [1, "Version must be at least 1."],
+      validate: {
+        validator: Number.isInteger,
+        message: "Version must be a whole number.",
+      },
     },
 
     /*
