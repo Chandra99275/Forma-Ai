@@ -105,7 +105,7 @@ const formSchema = new mongoose.Schema(
     formId: {
       type: String,
       required: true,
-      unique: true,
+      trim: true,
     },
 
     title: {
@@ -158,6 +158,20 @@ const formSchema = new mongoose.Schema(
   {
     timestamps: true,
   }
+);
+
+/*
+ * Each form can have multiple versions,
+ * but the same version number cannot exist twice.
+ *
+ * Example:
+ * claim-form + version 1 -> allowed
+ * claim-form + version 2 -> allowed
+ * claim-form + version 2 -> duplicate, not allowed
+ */
+formSchema.index(
+  { formId: 1, version: 1 },
+  { unique: true }
 );
 
 export default mongoose.model("FormSchema", formSchema);
