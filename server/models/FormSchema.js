@@ -161,6 +161,27 @@ const formSchema = new mongoose.Schema(
 );
 
 /*
+ * Prevent duplicate question IDs inside the same form.
+ *
+ * Question IDs are used to map answers, validation,
+ * branching logic, and AI-generated values.
+ */
+formSchema.pre("validate", function (next) {
+  const questionIds = this.questions.map((question) => question.id);
+
+  const uniqueQuestionIds = new Set(questionIds);
+
+  if (questionIds.length !== uniqueQuestionIds.size) {
+    this.invalidate(
+      "questions",
+      "Question IDs must be unique within a form."
+    );
+  }
+
+  next();
+});
+
+/*
  * Each form can have multiple versions,
  * but the same version number cannot exist twice.
  *
@@ -173,5 +194,7 @@ formSchema.index(
   { formId: 1, version: 1 },
   { unique: true }
 );
+
+
 
 export default mongoose.model("FormSchema", formSchema);
