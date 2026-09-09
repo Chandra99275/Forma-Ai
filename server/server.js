@@ -1,58 +1,120 @@
+// ==========================================
+// Forma AI - Backend Server
+// ==========================================
+
 import dotenv from "dotenv";
 import app from "./app.js";
 import connectDB from "./config/db.js";
 
-// ==============================
+// ==========================================
 // Load Environment Variables
-// ==============================
+// ==========================================
+
 dotenv.config();
 
-// ==============================
-// Connect MongoDB
-// ==============================
-connectDB();
+// ==========================================
+// Environment Variables
+// ==========================================
 
-// ==============================
-// Start Express Server
-// ==============================
 const PORT = process.env.PORT || 5000;
 
-const server = app.listen(PORT, () => {
-  console.log("=========================================");
-  console.log("🚀 Forma AI Backend Started Successfully");
-  console.log(`🌐 Server URL : http://localhost:${PORT}`);
-  console.log(`📦 Environment : ${process.env.NODE_ENV || "development"}`);
-  console.log(`📂 API Base URL : http://localhost:${PORT}/api`);
-  console.log("=========================================");
-});
+// ==========================================
+// Start Server
+// ==========================================
 
-// ==============================
-// Handle MongoDB Connection Errors
-// ==============================
-process.on("unhandledRejection", (err) => {
-  console.error("❌ Unhandled Rejection:", err.message);
+const startServer = async () => {
+  try {
+    // --------------------------------------
+    // Connect MongoDB
+    // --------------------------------------
 
-  server.close(() => process.exit(1));
-});
+    await connectDB();
 
-// ==============================
-// Handle Uncaught Exceptions
-// ==============================
-process.on("uncaughtException", (err) => {
-  console.error("❌ Uncaught Exception:", err.message);
+    console.log("✅ MongoDB Connected Successfully");
 
-  server.close(() => process.exit(1));
-});
+    // --------------------------------------
+    // Start Express Server
+    // --------------------------------------
 
-// ==============================
-// Graceful Shutdown (Ctrl + C)
-// ==============================
-process.on("SIGINT", () => {
-  console.log("\n🛑 Forma AI Server Stopped.");
-  server.close(() => process.exit(0));
-});
+    const server = app.listen(PORT, () => {
+      console.log("=========================================");
+      console.log("🚀 Forma AI Backend Started Successfully");
+      console.log("=========================================");
+      console.log(`🌐 Server URL   : http://localhost:${PORT}`);
+      console.log(
+        `📦 Environment  : ${process.env.NODE_ENV || "development"}`
+      );
+      console.log(`📂 API Base URL : http://localhost:${PORT}/api`);
+      console.log("=========================================");
+    });
 
-process.on("SIGTERM", () => {
-  console.log("\n🛑 Forma AI Server Terminated.");
-  server.close(() => process.exit(0));
-});
+    // ======================================
+    // Handle Unhandled Promise Rejections
+    // ======================================
+
+    process.on("unhandledRejection", (error) => {
+      console.error("❌ Unhandled Rejection:");
+      console.error(error);
+
+      server.close(() => {
+        process.exit(1);
+      });
+    });
+
+    // ======================================
+    // Handle Uncaught Exceptions
+    // ======================================
+
+    process.on("uncaughtException", (error) => {
+      console.error("❌ Uncaught Exception:");
+      console.error(error);
+
+      server.close(() => {
+        process.exit(1);
+      });
+    });
+
+    // ======================================
+    // Graceful Shutdown - Ctrl + C
+    // ======================================
+
+    process.on("SIGINT", () => {
+      console.log("\n🛑 Forma AI Server Stopping...");
+
+      server.close(() => {
+        console.log("✅ Server closed successfully.");
+        process.exit(0);
+      });
+    });
+
+    // ======================================
+    // Graceful Shutdown - SIGTERM
+    // ======================================
+
+    process.on("SIGTERM", () => {
+      console.log("\n🛑 Forma AI Server Terminating...");
+
+      server.close(() => {
+        console.log("✅ Server closed successfully.");
+        process.exit(0);
+      });
+    });
+  } catch (error) {
+    // ======================================
+    // Server Startup Error
+    // ======================================
+
+    console.error("=========================================");
+    console.error("❌ Failed to Start Forma AI Backend");
+    console.error("=========================================");
+    console.error("Error:", error.message);
+
+    process.exit(1);
+  }
+};
+
+// ==========================================
+// Start Application
+// ==========================================
+
+startServer();

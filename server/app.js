@@ -1,19 +1,39 @@
+// ==========================================
+// Forma AI - Express Application
+// ==========================================
+
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import helmet from "helmet";
 import morgan from "morgan";
 
+// ==========================================
 // Routes
+// ==========================================
+
 import authRoutes from "./routes/authRoutes.js";
 import formRoutes from "./routes/formRoutes.js";
 import aiRoutes from "./routes/aiRoutes.js";
 import submissionRoutes from "./routes/submissionRoutes.js";
+import claimRoutes from "./routes/claimRoutes.js";
+import documentRoutes from "./routes/documentRoutes.js";
 
+// ==========================================
 // Middleware
+// ==========================================
+
 import errorMiddleware from "./middleware/errorMiddleware.js";
 
+// ==========================================
+// Load Environment Variables
+// ==========================================
+
 dotenv.config();
+
+// ==========================================
+// Create Express Application
+// ==========================================
 
 const app = express();
 
@@ -21,13 +41,22 @@ const app = express();
    GLOBAL MIDDLEWARES
 ========================================== */
 
+// ------------------------------------------
 // Security Headers
+// ------------------------------------------
+
 app.use(helmet());
 
+// ------------------------------------------
 // HTTP Request Logger
+// ------------------------------------------
+
 app.use(morgan("dev"));
 
+// ------------------------------------------
 // CORS Configuration
+// ------------------------------------------
+
 app.use(
   cors({
     origin: process.env.CLIENT_ORIGIN || "http://localhost:5173",
@@ -35,17 +64,35 @@ app.use(
   })
 );
 
+// ------------------------------------------
 // Parse JSON Requests
-app.use(express.json({ limit: "10mb" }));
+// ------------------------------------------
 
+app.use(
+  express.json({
+    limit: "10mb",
+  })
+);
+
+// ------------------------------------------
 // Parse URL Encoded Requests
-app.use(express.urlencoded({ extended: true }));
+// ------------------------------------------
+
+app.use(
+  express.urlencoded({
+    extended: true,
+    limit: "10mb",
+  })
+);
 
 /* ==========================================
    HEALTH CHECK ROUTES
 ========================================== */
 
+// ------------------------------------------
 // Root Route
+// ------------------------------------------
+
 app.get("/", (req, res) => {
   res.status(200).json({
     success: true,
@@ -56,7 +103,10 @@ app.get("/", (req, res) => {
   });
 });
 
+// ------------------------------------------
 // API Health Check
+// ------------------------------------------
+
 app.get("/api/health", (req, res) => {
   res.status(200).json({
     success: true,
@@ -70,17 +120,41 @@ app.get("/api/health", (req, res) => {
    API ROUTES
 ========================================== */
 
+// ------------------------------------------
 // Authentication
+// ------------------------------------------
+
 app.use("/api/auth", authRoutes);
 
+// ------------------------------------------
 // Dynamic Forms
+// ------------------------------------------
+
 app.use("/api/forms", formRoutes);
 
+// ------------------------------------------
 // AI Parser / Gemini
+// ------------------------------------------
+
 app.use("/api/ai", aiRoutes);
 
+// ------------------------------------------
 // Form Submissions
+// ------------------------------------------
+
 app.use("/api/submissions", submissionRoutes);
+
+// ------------------------------------------
+// Insurance Claims
+// ------------------------------------------
+
+app.use("/api/claims", claimRoutes);
+
+// ------------------------------------------
+// Claim Documents
+// ------------------------------------------
+
+app.use("/api/documents", documentRoutes);
 
 /* ==========================================
    404 ROUTE HANDLER
