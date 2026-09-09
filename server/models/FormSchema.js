@@ -32,6 +32,16 @@ const validationSchema = new mongoose.Schema(
 
     max: {
       type: Number,
+      validate: {
+        validator: function (value) {
+          return (
+            this.min === undefined ||
+            value === undefined ||
+            value >= this.min
+          );
+        },
+        message: "max must be greater than or equal to min.",
+      },
     },
 
     pattern: {
