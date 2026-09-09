@@ -105,7 +105,7 @@ const formSchema = new mongoose.Schema(
     formId: {
       type: String,
       required: true,
-      unique: true,
+      trim: true,
     },
 
     title: {
@@ -115,11 +115,86 @@ const formSchema = new mongoose.Schema(
 
     description: String,
 
+    /*
+     * Schema version number.
+     *
+     * Version starts from 1 and can be increased whenever
+     * the structure of a form is changed.
+     */
+    version: {
+      type: Number,
+      default: 1,
+      min: [1, "Version must be at least 1."],
+      validate: {
+        validator: Number.isInteger,
+        message: "Version must be a whole number.",
+      },
+    },
+
+    /*
+     * Current lifecycle state of the form schema.
+     *
+     * draft     -> still being edited
+     * published -> available for users
+     * archived  -> no longer active
+     */
+    status: {
+      type: String,
+      enum: ["draft", "published", "archived"],
+      default: "draft",
+    },
+
+    /*
+ * Short note describing what changed in this version.
+ */
+    versionNote: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+  
     questions: [questionSchema],
   },
   {
     timestamps: true,
   }
 );
+
+/*
+ * Prevent duplicate question IDs inside the same form.
+ *
+ * Question IDs are used to map answers, validation,
+ * branching logic, and AI-generated values.
+ */
+formSchema.pre("validate", function (next) {
+  const questionIds = this.questions.map((question) => question.id);
+
+  const uniqueQuestionIds = new Set(questionIds);
+
+  if (questionIds.length !== uniqueQuestionIds.size) {
+    this.invalidate(
+      "questions",
+      "Question IDs must be unique within a form."
+    );
+  }
+
+  next();
+});
+
+/*
+ * Each form can have multiple versions,
+ * but the same version number cannot exist twice.
+ *
+ * Example:
+ * claim-form + version 1 -> allowed
+ * claim-form + version 2 -> allowed
+ * claim-form + version 2 -> duplicate, not allowed
+ */
+formSchema.index(
+  { formId: 1, version: 1 },
+  { unique: true }
+);
+
+
 
 export default mongoose.model("FormSchema", formSchema);
