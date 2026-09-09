@@ -1,4 +1,9 @@
-import React from "react";
+
+// ==========================================
+// Forma AI - Manual Insurance Form
+// ==========================================
+
+import React, { useEffect, useState } from "react";
 
 import HealthInsuranceForm from "./HealthInsuranceForm";
 import VehicleInsuranceForm from "./VehicleInsuranceForm";
@@ -6,62 +11,182 @@ import PropertyInsuranceForm from "./PropertyInsuranceForm";
 import TravelInsuranceForm from "./TravelInsuranceForm";
 import LifeInsuranceForm from "./LifeInsuranceForm";
 
-const ManualForm = ({ category }) => {
-  const renderSelectedForm = () => {
-    switch (category) {
-      case "health":
-        return <HealthInsuranceForm />;
+// ==========================================
+// ManualForm Component
+// ==========================================
 
-      case "vehicle":
-        return <VehicleInsuranceForm />;
+const ManualForm = ({ category, onFormDataChange }) => {
+  const [categoryData, setCategoryData] = useState({});
 
-      case "property":
-        return <PropertyInsuranceForm />;
+  // ==========================================
+  // Reset Form When Category Changes
+  // ==========================================
 
-      case "travel":
-        return <TravelInsuranceForm />;
+  useEffect(() => {
+    setCategoryData({});
 
-      case "life":
-        return <LifeInsuranceForm />;
+    if (onFormDataChange) {
+      onFormDataChange({});
+    }
+  }, [category]);
 
-      default:
-        return <VehicleInsuranceForm />;
+  // ==========================================
+  // Receive Data From Selected Insurance Form
+  // ==========================================
+
+  const handleCategoryDataChange = (data) => {
+    setCategoryData(data);
+
+    if (onFormDataChange) {
+      onFormDataChange(data);
     }
   };
 
+  // ==========================================
+  // Render Selected Insurance Form
+  // ==========================================
+
+  const renderSelectedForm = () => {
+    switch (category) {
+      case "health":
+        return (
+          <HealthInsuranceForm
+            onDataChange={handleCategoryDataChange}
+          />
+        );
+
+      case "vehicle":
+        return (
+          <VehicleInsuranceForm
+            onDataChange={handleCategoryDataChange}
+          />
+        );
+
+      case "property":
+        return (
+          <PropertyInsuranceForm
+            onDataChange={handleCategoryDataChange}
+          />
+        );
+
+      case "travel":
+        return (
+          <TravelInsuranceForm
+            onDataChange={handleCategoryDataChange}
+          />
+        );
+
+      case "life":
+        return (
+          <LifeInsuranceForm
+            onDataChange={handleCategoryDataChange}
+          />
+        );
+
+      default:
+        return (
+          <VehicleInsuranceForm
+            onDataChange={handleCategoryDataChange}
+          />
+        );
+    }
+  };
+
+  // ==========================================
+  // Component UI
+  // ==========================================
+
   return (
     <div className="manualFormContainer">
-      {/* Header */}
+
+      {/* ======================================
+          Header
+      ====================================== */}
+
       <div className="manualFormHeader">
         <h2>Dynamic Insurance Claim Form</h2>
 
         <p>
-          The form below changes automatically based on the insurance category
-          selected by the user.
+          The form below changes automatically based
+          on the insurance category selected.
         </p>
 
         <span className="categoryBadge">
-          Selected Category : {category.toUpperCase()}
+          Selected Category :{" "}
+          {category ? category.toUpperCase() : "VEHICLE"}
         </span>
       </div>
 
-      {/* Dynamic Form */}
-      <div className="dynamicFormCard">{renderSelectedForm()}</div>
+      {/* ======================================
+          Dynamic Category Form
+      ====================================== */}
 
-      {/* AI Suggestions */}
+      <div className="dynamicFormCard">
+        {renderSelectedForm()}
+      </div>
+
+      {/* ======================================
+          Smart Tips
+      ====================================== */}
+
       <div className="manualTipsCard">
         <h3>Forma AI Smart Tips</h3>
 
         <ul>
-          <li>Fill mandatory fields marked with *.</li>
-          <li>Upload supporting documents for faster claim approval.</li>
-          <li>Use AI Auto Fill if you have an incident description.</li>
-          <li>Image OCR automatically extracts information from photos.</li>
-          <li>PDF OCR reads medical bills, FIR copies and insurance policies.</li>
+          <li>
+            Fill all mandatory fields marked with
+            <strong> *</strong>.
+          </li>
+
+          <li>
+            Upload supporting documents for faster
+            claim processing.
+          </li>
+
+          <li>
+            Use AI Auto Fill to enter incident
+            information using natural language.
+          </li>
+
+          <li>
+            Upload supported documents for OCR-based
+            information extraction.
+          </li>
+
+          <li>
+            Review AI-generated information carefully
+            before submitting your claim.
+          </li>
         </ul>
       </div>
+
+      {/* ======================================
+          Backend Sync Information
+      ====================================== */}
+
+      <div className="manualBackendInfo">
+        <span className="backendStatusDot"></span>
+
+        <div>
+          <strong>Forma AI Backend Connected</strong>
+
+          <p>
+            Your form information is synchronized with
+            the claim management system when you save
+            or continue.
+          </p>
+        </div>
+      </div>
+
     </div>
   );
 };
 
+// ==========================================
+// IMPORTANT:
+// DynamicForms.jsx imports this component
+// as a DEFAULT import.
+// ==========================================
+
 export default ManualForm;
+
