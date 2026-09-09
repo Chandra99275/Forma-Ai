@@ -14,6 +14,16 @@ const validationSchema = new mongoose.Schema(
     maxLength: {
       type: Number,
       min: 0,
+      validate: {
+        validator: function (value) {
+          return (
+            this.minLength === undefined ||
+            value === undefined ||
+            value >= this.minLength
+          );
+        },
+        message: "maxLength must be greater than or equal to minLength.",
+      },
     },
 
     min: {
