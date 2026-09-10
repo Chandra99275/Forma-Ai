@@ -17,7 +17,7 @@ const generateToken = (id) => {
 
 /* ==========================================
    Register User (Signup)
-   POST /api/auth/register
+   POST /api/auth/register, POST /api/auth/signup
 ========================================== */
 export const registerUser = async (req, res) => {
   try {
@@ -31,14 +31,26 @@ export const registerUser = async (req, res) => {
       });
     }
 
-    // Check Existing User
-    const existingUser = await User.findOne({ email });
+    const normalizedEmail = email.trim().toLowerCase();
+
+    // Check Existing User by email or mobile
+    const existingUser = await User.findOne({
+      $or: [{ email: normalizedEmail }, { mobile: mobile.trim() }],
+    });
 
     if (existingUser) {
-      return res.status(400).json({
-        success: false,
-        message: "User already exists with this email.",
-      });
+      if (existingUser.email.toLowerCase() === normalizedEmail) {
+        return res.status(400).json({
+          success: false,
+          message: "User already exists with this email.",
+        });
+      }
+      if (existingUser.mobile === mobile.trim()) {
+        return res.status(400).json({
+          success: false,
+          message: "User already exists with this mobile number.",
+        });
+      }
     }
 
     // Hash Password
@@ -46,9 +58,9 @@ export const registerUser = async (req, res) => {
 
     // Create User
     const user = await User.create({
-      fullName,
-      email,
-      mobile,
+      fullName: fullName.trim(),
+      email: normalizedEmail,
+      mobile: mobile.trim(),
       password: hashedPassword,
       role: "user",
     });
@@ -68,9 +80,17 @@ export const registerUser = async (req, res) => {
   } catch (error) {
     console.error("Register Error:", error.message);
 
+    if (error.code === 11000) {
+      const field = Object.keys(error.keyPattern || {})[0] || "detail";
+      return res.status(400).json({
+        success: false,
+        message: `User already exists with this ${field}.`,
+      });
+    }
+
     res.status(500).json({
       success: false,
-      message: "Internal Server Error",
+      message: error.message || "Internal Server Error",
     });
   }
 };
@@ -91,8 +111,10 @@ export const loginUser = async (req, res) => {
       });
     }
 
+    const normalizedEmail = email.trim().toLowerCase();
+
     // Find User
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ email: normalizedEmail });
 
     if (!user) {
       return res.status(404).json({

@@ -13,8 +13,9 @@ const router = express.Router();
    Authentication Routes
 ========================================== */
 
-// Register User
+// Register / Signup User
 router.post("/register", registerUser);
+router.post("/signup", registerUser);
 
 // Login User
 router.post("/login", loginUser);

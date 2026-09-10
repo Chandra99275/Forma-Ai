@@ -7,6 +7,11 @@ const authApi = {
     return response.data;
   },
 
+  signup: async (data) => {
+    const response = await apiClient.post(API_ENDPOINTS.AUTH.SIGNUP, data);
+    return response.data;
+  },
+
   login: async (data) => {
     const response = await apiClient.post(API_ENDPOINTS.AUTH.LOGIN, data);
     return response.data;

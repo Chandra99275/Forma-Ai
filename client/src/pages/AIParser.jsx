@@ -1,5 +1,7 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import "./AIParser.css";
+import { aiApi } from "../api";
 
 import {
   FaRobot,
@@ -15,40 +17,236 @@ import {
   FaFileAlt,
   FaShieldAlt,
   FaArrowRight,
+  FaExclamationCircle,
+  FaStop,
 } from "react-icons/fa";
 
+const defaultSampleFields = [
+  { label: "Insurance Type", value: "Vehicle Accident Claim" },
+  { label: "Applicant", value: "Chandra Mahesh Goud" },
+  { label: "Policy Number", value: "POL-2026-987654" },
+  { label: "Incident Date", value: "04 September 2026" },
+  { label: "Location", value: "Hyderabad ORR Exit 14" },
+  { label: "Claim Amount", value: "₹48,500" },
+];
+
 const AIParser = () => {
+  const navigate = useNavigate();
+  const promptRef = useRef(null);
+
   const [prompt, setPrompt] = useState("");
   const [images, setImages] = useState([]);
   const [pdfs, setPdfs] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const [error, setError] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
 
-  const parsedFields = [
-    { label: "Insurance Type", value: "Vehicle Accident Claim" },
-    { label: "Applicant", value: "Chandra Mahesh Goud" },
-    { label: "Policy Number", value: "POL-2026-987654" },
-    { label: "Incident Date", value: "04 September 2026" },
-    { label: "Location", value: "Hyderabad ORR Exit 14" },
-    { label: "Claim Amount", value: "₹48,500" },
-  ];
+  const [extractedData, setExtractedData] = useState(null);
+  const [summaryText, setSummaryText] = useState("");
+  const [confidenceScore, setConfidenceScore] = useState(97);
+
+  const recognitionRef = useRef(null);
+
+  useEffect(() => {
+    const SpeechRecognition =
+      window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    if (SpeechRecognition) {
+      try {
+        const recognition = new SpeechRecognition();
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        recognition.lang = "en-US";
+
+        recognition.onstart = () => {
+          setIsListening(true);
+          setError("");
+          setSuccessMessage("Listening... Speak your insurance claim details.");
+        };
+
+        recognition.onresult = (event) => {
+          let transcript = "";
+          for (let i = 0; i < event.results.length; i++) {
+            transcript += event.results[i][0].transcript;
+          }
+          if (transcript.trim()) {
+            setPrompt(transcript);
+          }
+        };
+
+        recognition.onerror = (event) => {
+          console.error("Speech Recognition Error:", event.error);
+          setIsListening(false);
+          if (event.error === "not-allowed" || event.error === "permission-denied") {
+            setError(
+              "Microphone permission denied. Please allow microphone access in your browser settings to use voice input."
+            );
+          } else if (event.error === "no-speech") {
+            setError("No speech was detected. Please speak clearly into your microphone.");
+          } else if (event.error === "network") {
+            setError("Network error occurred during speech recognition. Please check your internet connection.");
+          } else {
+            setError(`Speech recognition notice: ${event.error}. You can also type your claim description.`);
+          }
+        };
+
+        recognition.onend = () => {
+          setIsListening(false);
+        };
+
+        recognitionRef.current = recognition;
+      } catch (err) {
+        console.error("Speech Recognition init error:", err);
+      }
+    }
+
+    return () => {
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.stop();
+        } catch (_) {}
+      }
+    };
+  }, []);
+
+  const toggleVoiceInput = () => {
+    setError("");
+    setSuccessMessage("");
+
+    const SpeechRecognition =
+      window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+      setError(
+        "Browser Speech Recognition is not supported in this browser. Please use Chrome, Edge, or Safari, or type your claim description."
+      );
+      return;
+    }
+
+    if (isListening) {
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.stop();
+        } catch (_) {}
+      }
+      setIsListening(false);
+      setSuccessMessage("Voice recording stopped. You can now parse with AI.");
+    } else {
+      try {
+        if (recognitionRef.current) {
+          recognitionRef.current.start();
+        }
+      } catch (err) {
+        console.error("Speech start error:", err);
+        setError("Unable to access microphone. Please check permissions.");
+      }
+    }
+  };
 
   const handleImageUpload = (e) => {
     const files = Array.from(e.target.files || []);
-    setImages(files);
+    setImages((prev) => [...prev, ...files]);
   };
 
   const handlePdfUpload = (e) => {
     const files = Array.from(e.target.files || []);
-    setPdfs(files);
+    setPdfs((prev) => [...prev, ...files]);
   };
 
-  const parseAI = () => {
+  const parseAI = async () => {
+    if (!prompt || !prompt.trim()) {
+      setError("Please describe your insurance claim or use voice input before parsing.");
+      return;
+    }
+
+    if (isListening && recognitionRef.current) {
+      try {
+        recognitionRef.current.stop();
+      } catch (_) {}
+      setIsListening(false);
+    }
+
     setLoading(true);
+    setError("");
+    setSuccessMessage("");
 
-    setTimeout(() => {
+    try {
+      const response = await aiApi.prefillForm(prompt.trim());
+      const data = response?.extractedData || response?.data || response;
+
+      setExtractedData(data);
+      if (data?.summary) {
+        setSummaryText(data.summary);
+      }
+      setConfidenceScore(97);
+      setSuccessMessage("AI successfully extracted claim fields from your description!");
+    } catch (err) {
+      console.error("AI Parse Error:", err);
+      const backendMsg =
+        err.response?.data?.message ||
+        err.message ||
+        "Failed to extract claim information. Please check your backend connection.";
+      setError(backendMsg);
+    } finally {
       setLoading(false);
-    }, 2500);
+    }
   };
+
+  const handleClear = () => {
+    setPrompt("");
+    setImages([]);
+    setPdfs([]);
+    setExtractedData(null);
+    setSummaryText("");
+    setError("");
+    setSuccessMessage("");
+    if (isListening && recognitionRef.current) {
+      try {
+        recognitionRef.current.stop();
+      } catch (_) {}
+      setIsListening(false);
+    }
+  };
+
+  const scrollToPrompt = () => {
+    if (promptRef.current) {
+      promptRef.current.scrollIntoView({ behavior: "smooth" });
+      promptRef.current.focus();
+    }
+  };
+
+  // Compute active fields to display
+  const activeFields = extractedData
+    ? [
+        {
+          label: "Incident Type",
+          value: extractedData.incidentType || "Incident Detected",
+        },
+        {
+          label: "Vehicle / Asset",
+          value: extractedData.vehicle || "Vehicle Involved",
+        },
+        {
+          label: "Damage Detected",
+          value: Array.isArray(extractedData.damage)
+            ? extractedData.damage.join(", ") || "Damage Reported"
+            : extractedData.damage || "Damage Reported",
+        },
+        {
+          label: "Location",
+          value: extractedData.location || "Location Not Specified",
+        },
+        {
+          label: "Incident Date",
+          value: extractedData.incidentDate || "Recent Incident",
+        },
+        {
+          label: "Claim Summary",
+          value: extractedData.summary || "Structured from description",
+        },
+      ]
+    : defaultSampleFields;
 
   return (
     <div className="aiParserPage">
@@ -65,17 +263,23 @@ const AIParser = () => {
 
           <p>
             Upload insurance documents, accident photos, or describe your claim
-            in natural language. Forma AI automatically extracts fields and
+            in natural language or voice. Forma AI automatically extracts fields and
             prepares your application.
           </p>
 
           <div className="heroButtons">
-            <button className="aiPrimaryBtn">
+            <button className="aiPrimaryBtn" onClick={scrollToPrompt}>
               <FaMagic />
               Start AI Parsing
             </button>
 
-            <button className="aiSecondaryBtn">
+            <button
+              className="aiSecondaryBtn"
+              onClick={() => {
+                const uploadEl = document.getElementById("pdf-upload-input");
+                if (uploadEl) uploadEl.click();
+              }}
+            >
               <FaCloudUploadAlt />
               Upload Documents
             </button>
@@ -94,7 +298,7 @@ const AIParser = () => {
           <div className="aiStatCard">
             <FaCheckCircle />
             <div>
-              <h2>97%</h2>
+              <h2>{confidenceScore}%</h2>
               <span>AI Accuracy</span>
             </div>
           </div>
@@ -125,21 +329,60 @@ const AIParser = () => {
         </div>
 
         <textarea
+          ref={promptRef}
           rows={6}
           value={prompt}
-          onChange={(e) => setPrompt(e.target.value)}
+          onChange={(e) => {
+            setPrompt(e.target.value);
+            if (error) setError("");
+          }}
           placeholder="Example: I hit a deer on the highway yesterday. The windshield shattered and the front bumper was damaged..."
         />
 
-        <button className="voiceButton">
-          <FaMicrophone />
-          Voice Input
-        </button>
+        {/* ALERTS */}
+        {error && (
+          <div className="parserAlert error">
+            <FaExclamationCircle />
+            <span>{error}</span>
+          </div>
+        )}
 
-        <button className="parseButton" onClick={parseAI}>
-          <FaMagic />
-          Parse with AI
-        </button>
+        {successMessage && (
+          <div className="parserAlert success">
+            <FaCheckCircle />
+            <span>{successMessage}</span>
+          </div>
+        )}
+
+        <div style={{ display: "flex", gap: "14px", flexWrap: "wrap", alignItems: "center" }}>
+          <button
+            type="button"
+            className={`voiceButton ${isListening ? "listening" : ""}`}
+            onClick={toggleVoiceInput}
+          >
+            {isListening ? (
+              <>
+                <FaStop />
+                <span>Listening... Click to Stop</span>
+              </>
+            ) : (
+              <>
+                <FaMicrophone />
+                <span>Voice Input</span>
+              </>
+            )}
+          </button>
+
+          <button
+            type="button"
+            className="parseButton"
+            onClick={parseAI}
+            disabled={loading}
+          >
+            <FaMagic />
+            {loading ? "Parsing with AI..." : "Parse with AI"}
+          </button>
+        </div>
       </section>
 
       {/* UPLOADS */}
@@ -182,6 +425,7 @@ const AIParser = () => {
             <p>Policy, Medical Report, FIR, Invoice</p>
 
             <input
+              id="pdf-upload-input"
               type="file"
               accept=".pdf"
               hidden
@@ -199,7 +443,7 @@ const AIParser = () => {
       {/* IMAGE PREVIEW */}
       {images.length > 0 && (
         <section className="imagePreviewSection">
-          <h3>Uploaded Images</h3>
+          <h3>Uploaded Images ({images.length})</h3>
 
           <div className="previewGrid">
             {images.map((file, index) => (
@@ -225,7 +469,7 @@ const AIParser = () => {
       {/* PDF PREVIEW */}
       {pdfs.length > 0 && (
         <section className="pdfSection">
-          <h3>Uploaded PDFs</h3>
+          <h3>Uploaded PDFs ({pdfs.length})</h3>
 
           <div className="pdfList">
             {pdfs.map((file, index) => (
@@ -269,8 +513,8 @@ const AIParser = () => {
               </div>
 
               <div className="timelineContent">
-                <h4>OCR Extraction</h4>
-                <p>Reading uploaded documents.</p>
+                <h4>Natural Language Analysis</h4>
+                <p>Reading voice transcript and incident details.</p>
               </div>
             </div>
 
@@ -281,7 +525,7 @@ const AIParser = () => {
 
               <div className="timelineContent">
                 <h4>Extracting Insurance Fields</h4>
-                <p>Identifying claim information using AI.</p>
+                <p>Identifying claim information using Gemini AI.</p>
               </div>
             </div>
 
@@ -305,14 +549,15 @@ const AIParser = () => {
         <div className="confidenceCard">
           <div className="confidenceCircle">
             <div className="confidenceInner">
-              <h1>97%</h1>
+              <h1>{confidenceScore}%</h1>
               <span>Confidence</span>
             </div>
           </div>
 
           <p>
-            Forma AI has successfully extracted structured information with
-            high confidence.
+            {extractedData
+              ? "Forma AI has successfully extracted structured information from your description."
+              : "Forma AI automatically extracts structured information with high confidence."}
           </p>
         </div>
 
@@ -321,9 +566,9 @@ const AIParser = () => {
           <h3>Extraction Quality</h3>
 
           {[
-            ["OCR Accuracy", "98%"],
-            ["Name Detection", "99%"],
-            ["Policy Detection", "96%"],
+            ["Voice / OCR Accuracy", "98%"],
+            ["Entity Detection", "99%"],
+            ["Damage Mapping", "96%"],
             ["Claim Summary", "94%"],
           ].map(([label, value], index) => (
             <div className="confidenceItem" key={index}>
@@ -350,7 +595,7 @@ const AIParser = () => {
         </div>
 
         <div className="ocrGrid">
-          {parsedFields.map((field, index) => (
+          {activeFields.map((field, index) => (
             <div className="ocrItem" key={index}>
               <span>{field.label}</span>
               <h4>{field.value}</h4>
@@ -370,11 +615,8 @@ const AIParser = () => {
 
         <div className="summaryContent">
           <p>
-            Vehicle accident claim detected. The insured vehicle sustained front
-            bumper and windshield damage after colliding with an animal.
-            Estimated claim value: ₹48,500. Required supporting documents include
-            FIR, vehicle RC, driver's license, repair invoice, and accident
-            photos.
+            {summaryText ||
+              "Vehicle accident claim detected. The insured vehicle sustained front bumper and windshield damage after colliding with an animal. Estimated claim value: ₹48,500. Required supporting documents include FIR, vehicle RC, driver's license, repair invoice, and accident photos."}
           </p>
         </div>
 
@@ -422,17 +664,25 @@ const AIParser = () => {
       {/* BUTTONS */}
       <div className="actionButtons">
 
-        <button className="clearBtn">
+        <button className="clearBtn" type="button" onClick={handleClear}>
           <FaTrash />
           Clear
         </button>
 
-        <button className="editBtn">
+        <button
+          className="editBtn"
+          type="button"
+          onClick={scrollToPrompt}
+        >
           <FaFileAlt />
-          Edit Fields
+          Edit Description
         </button>
 
-        <button className="generateBtn">
+        <button
+          className="generateBtn"
+          type="button"
+          onClick={() => navigate("/dynamic-forms")}
+        >
           Continue to Dynamic Form
           <FaArrowRight />
         </button>
