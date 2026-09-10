@@ -46,6 +46,21 @@ const validationSchema = new mongoose.Schema(
 
     pattern: {
       type: String,
+      validate: {
+        validator: function (value) {
+          if (value === undefined || value === "") {
+            return true;
+          }
+
+          try {
+            new RegExp(value);
+            return true;
+          } catch (error) {
+            return false;
+          }
+        },
+        message: "pattern must be a valid regular expression.",
+      },
     },
 
     errorMessage: {
