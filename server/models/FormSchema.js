@@ -125,6 +125,38 @@ const questionSchema = new mongoose.Schema(
     showIf: {
       type: mongoose.Schema.Types.Mixed,
       default: null,
+      validate: {
+        validator: function (value) {
+          if (value === null || value === undefined) {
+            return true;
+          }
+
+          if (typeof value !== "object" || Array.isArray(value)) {
+            return false;
+          }
+
+          const { questionId, operator, value: conditionValue } = value;
+
+          const allowedOperators = [
+            "equals",
+            "notEquals",
+            "contains",
+            "greaterThan",
+            "lessThan",
+            "greaterThanOrEqual",
+            "lessThanOrEqual",
+          ];
+
+          return (
+            typeof questionId === "string" &&
+            questionId.trim() !== "" &&
+            typeof operator === "string" &&
+            allowedOperators.includes(operator) &&
+            conditionValue !== undefined
+          );
+        },
+        message: "showIf must contain a valid questionId, operator, and value.",
+      },
     },
   },
   {
