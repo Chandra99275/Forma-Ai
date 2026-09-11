@@ -1,5 +1,9 @@
 
+// ==========================================
+// Forma AI - Dynamic Insurance Claim Forms
+// ==========================================
 import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import "./DynamicForms.css";
 
 import {
@@ -19,6 +23,9 @@ import {
   FaBolt,
   FaClipboardList,
   FaArrowRight,
+  FaDownload,
+  FaEye,
+  FaTimes,
 } from "react-icons/fa";
 
 // Components
@@ -34,21 +41,32 @@ import {
   submitClaim,
 } from "../services/claimService";
 
+// PDF Generator
+import { generateClaimPDF } from "../services/pdfService";
+
+// ==========================================
+// Component
+// ==========================================
 
 const DynamicForms = () => {
+  // ==========================================
+  // NAVIGATION
+  // ==========================================
 
-  /* =====================================================
-     STATE MANAGEMENT
-  ===================================================== */
+  const navigate = useNavigate();
 
-  const [selectedCategory, setSelectedCategory] = useState("vehicle");
+  // ==========================================
+  // STATE
+  // ==========================================
+
+  const [selectedCategory, setSelectedCategory] =
+    useState("vehicle");
 
   const [applicationMode, setApplicationMode] =
     useState("manual");
 
   const [currentStep, setCurrentStep] = useState(1);
 
-  // Common applicant information
   const [formData, setFormData] = useState({
     applicantName: "",
     email: "",
@@ -57,25 +75,29 @@ const DynamicForms = () => {
     description: "",
   });
 
-  // Category-specific form information
-  const [categoryFormData, setCategoryFormData] = useState({});
+  const [categoryFormData, setCategoryFormData] =
+    useState({});
 
-  // Backend claim ID
   const [claimId, setClaimId] = useState(null);
 
-  // Loading state
+  const [claimNumber, setClaimNumber] = useState("");
+
   const [loading, setLoading] = useState(false);
 
-  // Success message
   const [message, setMessage] = useState("");
 
-  // Error message
   const [error, setError] = useState("");
 
+  // PDF states
+  const [pdfUrl, setPdfUrl] = useState("");
 
-  /* =====================================================
-     CATEGORY LIST
-  ===================================================== */
+  const [pdfFileName, setPdfFileName] = useState("");
+
+  const [showPdf, setShowPdf] = useState(false);
+
+  // ==========================================
+  // INSURANCE CATEGORIES
+  // ==========================================
 
   const insuranceCategories = [
     {
@@ -124,364 +146,531 @@ const DynamicForms = () => {
     },
   ];
 
-
-  /* =====================================================
-     COMMON INPUT HANDLER
-  ===================================================== */
+  // ==========================================
+  // COMMON INPUT
+  // ==========================================
 
   const handleChange = (e) => {
     const { name, value } = e.target;
 
-    setFormData((prev) => ({
-      ...prev,
+    setFormData((previous) => ({
+      ...previous,
       [name]: value,
     }));
   };
 
-
-  /* =====================================================
-     CATEGORY FORM DATA HANDLER
-  ===================================================== */
+  // ==========================================
+  // CATEGORY FORM DATA
+  // ==========================================
 
   const handleCategoryFormData = (data) => {
-    setCategoryFormData(data);
+    setCategoryFormData(data || {});
   };
 
-
-  /* =====================================================
-     CHANGE CATEGORY
-  ===================================================== */
+  // ==========================================
+  // CATEGORY CHANGE
+  // ==========================================
 
   const handleCategoryChange = (category) => {
     setSelectedCategory(category);
 
-    // Clear old category-specific data
     setCategoryFormData({});
 
-    // Clear messages
-    setMessage("");
-    setError("");
-
-    /*
-      A claim ID belongs to the selected category.
-      If the user changes category, start a new claim.
-    */
     setClaimId(null);
 
-    // Start again from step 1
+    setClaimNumber("");
+
+    setMessage("");
+
+    setError("");
+
+    setPdfUrl("");
+
+    setPdfFileName("");
+
+    setShowPdf(false);
+
     setCurrentStep(1);
   };
 
-
-  /* =====================================================
-     COMPLETE CLAIM DATA
-  ===================================================== */
+  // ==========================================
+  // COMPLETE CLAIM DATA
+  // ==========================================
 
   const getCompleteClaimData = () => {
-
     return {
       ...formData,
       ...categoryFormData,
     };
-
   };
 
-
-  /* =====================================================
-     CREATE OR UPDATE CLAIM
-  ===================================================== */
+  // ==========================================
+  // SAVE CLAIM
+  // ==========================================
 
   const saveClaim = async () => {
-
     setLoading(true);
     setMessage("");
     setError("");
 
     try {
-
       const completeClaimData =
         getCompleteClaimData();
 
+      console.log(
+        "========================================="
+      );
+      console.log("📤 SAVE CLAIM");
+      console.log(
+        "========================================="
+      );
+      console.log(
+        "Category:",
+        selectedCategory
+      );
+      console.log(
+        "Claim Data:",
+        completeClaimData
+      );
+
       let result;
 
-      /* ===============================================
-         CREATE NEW CLAIM
-      =============================================== */
+      // ========================================
+      // CREATE
+      // ========================================
 
       if (!claimId) {
-
         result = await createClaim(
-          selectedCategory,
-          completeClaimData
+          completeClaimData,
+          selectedCategory
         );
 
-        /*
-          Backend response expected:
+        const newClaimId =
+          result?.claim?._id;
 
-          {
-            success: true,
-            claim: {
-              _id: "...",
-              claimNumber: "CLM-2026-0001"
-            }
-          }
-        */
+        const newClaimNumber =
+          result?.claim?.claimNumber;
 
-        if (result?.claim?._id) {
-          setClaimId(result.claim._id);
+        if (newClaimId) {
+          setClaimId(newClaimId);
+        }
+
+        if (newClaimNumber) {
+          setClaimNumber(newClaimNumber);
         }
 
         setMessage(
           `Draft saved successfully${
-            result?.claim?.claimNumber
-              ? ` — ${result.claim.claimNumber}`
+            newClaimNumber
+              ? ` — ${newClaimNumber}`
               : ""
           }`
         );
-
       }
 
-      /* ===============================================
-         UPDATE EXISTING CLAIM
-      =============================================== */
+      // ========================================
+      // UPDATE
+      // ========================================
 
       else {
-
         result = await updateClaim(
           claimId,
           completeClaimData
         );
 
-        setMessage("Claim draft updated successfully.");
+        if (result?.claim?.claimNumber) {
+          setClaimNumber(
+            result.claim.claimNumber
+          );
+        }
 
+        setMessage(
+          "Claim draft updated successfully."
+        );
       }
 
+      console.log(
+        "✅ Save claim successful:",
+        result
+      );
+
       return result;
-
     } catch (err) {
+      console.error(
+        "❌ Save Claim Error:",
+        err
+      );
 
-      console.error("Save Claim Error:", err);
+      console.error(
+        "Server Response:",
+        err.response?.data
+      );
 
       setError(
-        err.message ||
+        err.response?.data?.message ||
+          err.message ||
           "Unable to save claim. Please try again."
       );
 
       throw err;
-
     } finally {
-
       setLoading(false);
-
     }
   };
 
-
-  /* =====================================================
-     SAVE DRAFT
-  ===================================================== */
+  // ==========================================
+  // SAVE DRAFT
+  // ==========================================
 
   const handleSaveDraft = async () => {
-
     try {
-
       await saveClaim();
-
     } catch (err) {
-
-      // Error already displayed by saveClaim
-
+      console.error(err);
     }
-
   };
 
-
-  /* =====================================================
-     CONTINUE
-  ===================================================== */
+  // ==========================================
+  // NEXT STEP
+  // ==========================================
 
   const nextStep = async () => {
-
-    /*
-      Save current form before moving
-      to the next step.
-    */
-
     try {
-
       await saveClaim();
 
       if (currentStep < 5) {
-
-        setCurrentStep((prev) => prev + 1);
-
+        setCurrentStep(
+          (previous) => previous + 1
+        );
       }
-
     } catch (err) {
-
       console.error(
         "Continue Error:",
         err
       );
-
     }
-
   };
 
-
-  /* =====================================================
-     PREVIOUS STEP
-  ===================================================== */
+  // ==========================================
+  // PREVIOUS STEP
+  // ==========================================
 
   const previousStep = () => {
-
     if (currentStep > 1) {
-
       setCurrentStep(
-        (prev) => prev - 1
+        (previous) => previous - 1
       );
-
     }
-
   };
 
-
-  /* =====================================================
-     SUBMIT CLAIM
-  ===================================================== */
+  // ==========================================
+  // SUBMIT CLAIM + GENERATE PDF
+  // ==========================================
 
   const handleSubmitClaim = async () => {
-
     setLoading(true);
     setMessage("");
     setError("");
 
     try {
-
-      /*
-        First save the latest form data.
-      */
-
       const completeClaimData =
         getCompleteClaimData();
 
+      console.log(
+        "========================================="
+      );
+      console.log("🚀 SUBMITTING CLAIM");
+      console.log(
+        "========================================="
+      );
+      console.log(
+        "Category:",
+        selectedCategory
+      );
+      console.log(
+        "Complete Claim Data:",
+        completeClaimData
+      );
+
       let currentClaimId = claimId;
 
-      /* ===============================================
-         CREATE CLAIM IF IT DOES NOT EXIST
-      =============================================== */
+      let currentClaim = {};
+
+      // ========================================
+      // CREATE CLAIM IF NEEDED
+      // ========================================
 
       if (!currentClaimId) {
-
         const createResult =
           await createClaim(
-            selectedCategory,
-            completeClaimData
+            completeClaimData,
+            selectedCategory
           );
+
+        console.log(
+          "✅ Create Result:",
+          createResult
+        );
+
+        currentClaim =
+          createResult?.claim || {};
 
         currentClaimId =
-          createResult?.claim?._id;
+          currentClaim?._id;
 
         if (!currentClaimId) {
-
           throw new Error(
-            "Claim was created but claim ID was not returned."
+            "Claim was created but no claim ID was returned."
           );
-
         }
 
         setClaimId(currentClaimId);
 
+        if (currentClaim.claimNumber) {
+          setClaimNumber(
+            currentClaim.claimNumber
+          );
+        }
       }
 
-      /* ===============================================
-         UPDATE LATEST DATA
-      =============================================== */
+      // ========================================
+      // UPDATE EXISTING CLAIM
+      // ========================================
 
       else {
+        const updateResult =
+          await updateClaim(
+            currentClaimId,
+            completeClaimData
+          );
 
-        await updateClaim(
-          currentClaimId,
-          completeClaimData
+        console.log(
+          "✅ Update Result:",
+          updateResult
         );
 
+        currentClaim =
+          updateResult?.claim || {};
+
+        if (currentClaim.claimNumber) {
+          setClaimNumber(
+            currentClaim.claimNumber
+          );
+        }
       }
 
-      /* ===============================================
-         SUBMIT CLAIM
-      =============================================== */
+      // ========================================
+      // SUBMIT CLAIM
+      // ========================================
 
       const submitResult =
-        await submitClaim(currentClaimId);
+        await submitClaim(
+          currentClaimId
+        );
 
-      setMessage(
-        `Claim submitted successfully${
-          submitResult?.claim?.claimNumber
-            ? ` — ${submitResult.claim.claimNumber}`
-            : ""
-        }`
+      console.log(
+        "✅ Submit Result:",
+        submitResult
       );
 
-      /*
-        Move to final step
-      */
+      const submittedClaim =
+        submitResult?.claim ||
+        currentClaim ||
+        {};
+
+      const finalClaimNumber =
+        submittedClaim.claimNumber ||
+        claimNumber ||
+        `CLM-${Date.now()}`;
+
+      const finalSubmittedClaim = {
+        ...submittedClaim,
+
+        _id: currentClaimId,
+
+        claimNumber:
+          finalClaimNumber,
+
+        category:
+          submittedClaim.category ||
+          selectedCategory,
+
+        status:
+          submittedClaim.status ||
+          "submitted",
+
+        submittedAt:
+          submittedClaim.submittedAt ||
+          new Date().toISOString(),
+      };
+
+      setClaimNumber(
+        finalClaimNumber
+      );
+
+      // ========================================
+      // REMOVE OLD PDF URL
+      // ========================================
+
+      if (pdfUrl) {
+        URL.revokeObjectURL(pdfUrl);
+      }
+
+      // ========================================
+      // GENERATE PDF
+      // ========================================
+
+      const generatedPDF =
+        generateClaimPDF({
+          claim:
+            finalSubmittedClaim,
+
+          category:
+            selectedCategory,
+
+          claimData:
+            completeClaimData,
+        });
+
+      if (
+        !generatedPDF ||
+        !generatedPDF.url
+      ) {
+        throw new Error(
+          "PDF was not generated."
+        );
+      }
+
+      // ========================================
+      // STORE PDF
+      // ========================================
+
+      setPdfUrl(
+        generatedPDF.url
+      );
+
+      setPdfFileName(
+        generatedPDF.fileName ||
+          `${finalClaimNumber}.pdf`
+      );
+
+      setShowPdf(true);
+
+      // ========================================
+      // SUCCESS
+      // ========================================
+
+      setMessage(
+        `Claim submitted successfully — ${finalClaimNumber}`
+      );
 
       setCurrentStep(5);
 
+      console.log(
+        "========================================="
+      );
+      console.log(
+        "🎉 CLAIM SUBMITTED SUCCESSFULLY"
+      );
+      console.log(
+        "Claim Number:",
+        finalClaimNumber
+      );
+      console.log(
+        "========================================="
+      );
     } catch (err) {
-
       console.error(
-        "Submit Claim Error:",
+        "❌ Submit Claim Error:",
         err
       );
 
-      setError(
-        err.message ||
-          "Unable to submit claim. Please try again."
+      console.error(
+        "Server Response:",
+        err.response?.data
       );
 
+      setError(
+        err.response?.data?.message ||
+          err.message ||
+          "Unable to submit claim. Please try again."
+      );
     } finally {
-
       setLoading(false);
-
     }
-
   };
 
+  // ==========================================
+  // DOWNLOAD PDF
+  // ==========================================
 
-  /* =====================================================
-     CATEGORY DATA RESET
-  ===================================================== */
+  const handleDownloadPDF = () => {
+    if (!pdfUrl) {
+      return;
+    }
+
+    const link =
+      document.createElement("a");
+
+    link.href = pdfUrl;
+
+    link.download =
+      pdfFileName ||
+      "forma-ai-claim.pdf";
+
+    document.body.appendChild(link);
+
+    link.click();
+
+    document.body.removeChild(link);
+  };
+
+  // ==========================================
+  // OPEN PDF IN NEW TAB
+  // ==========================================
+
+  const handleOpenPDF = () => {
+    if (!pdfUrl) {
+      return;
+    }
+
+    window.open(
+      pdfUrl,
+      "_blank",
+      "noopener,noreferrer"
+    );
+  };
+
+  // ==========================================
+  // CLEAN PDF URL WHEN COMPONENT UNMOUNTS
+  // ==========================================
 
   useEffect(() => {
+    return () => {
+      if (pdfUrl) {
+        URL.revokeObjectURL(pdfUrl);
+      }
+    };
+  }, [pdfUrl]);
 
-    setCategoryFormData({});
-
-  }, [selectedCategory]);
-
-
-  /* =====================================================
-     RENDER
-  ===================================================== */
+  // ==========================================
+  // RENDER
+  // ==========================================
 
   return (
-
     <div className="dynamicPage">
 
-      {/* =================================================
-          HERO SECTION
-      ================================================= */}
+      {/* ======================================
+          HERO
+      ====================================== */}
 
       <section className="heroBanner">
 
         <div className="heroLeft">
 
           <span className="heroBadge">
-
             <FaRobot />
-
             AI Powered Insurance Forms
-
           </span>
 
           <h1>
@@ -489,13 +678,11 @@ const DynamicForms = () => {
           </h1>
 
           <p>
-
-            Smart AI-Augmented Dynamic Form Engine for
-            Health, Vehicle, Property, Travel and Life
-            Insurance Claims. Upload PDFs, Images or
-            manually fill your insurance application
-            within minutes.
-
+            Smart AI-Augmented Dynamic Form Engine
+            for Health, Vehicle, Property, Travel
+            and Life Insurance Claims. Upload PDFs,
+            images or manually fill your insurance
+            application within minutes.
           </p>
 
           <div className="heroButtons">
@@ -504,14 +691,11 @@ const DynamicForms = () => {
               className="primaryBtn"
               type="button"
               onClick={() =>
-                setApplicationMode("ai")
+                navigate("/ai-parser")
               }
             >
-
               <FaMagic />
-
               AI Auto Fill
-
             </button>
 
             <button
@@ -521,104 +705,75 @@ const DynamicForms = () => {
                 setApplicationMode("manual")
               }
             >
-
               <FaClipboardList />
-
               Manual Application
-
             </button>
 
           </div>
 
         </div>
 
-
         <div className="heroRight">
 
           <div className="statCard">
-
             <FaClipboardList />
 
             <div>
-
               <h2>120+</h2>
-
               <span>
                 Insurance Templates
               </span>
-
             </div>
-
           </div>
 
-
           <div className="statCard">
-
             <FaRobot />
 
             <div>
-
               <h2>98%</h2>
-
               <span>
                 AI Accuracy
               </span>
-
             </div>
-
           </div>
 
-
           <div className="statCard">
-
             <FaBolt />
 
             <div>
-
               <h2>25,000+</h2>
-
               <span>
                 Claims Submitted
               </span>
-
             </div>
-
           </div>
 
-
           <div className="statCard">
-
             <FaCheckCircle />
 
             <div>
-
               <h2>95%</h2>
-
               <span>
                 Success Rate
               </span>
-
             </div>
-
           </div>
 
         </div>
 
       </section>
 
-
-      {/* =================================================
-          PROGRESS STEPPER
-      ================================================= */}
+      {/* ======================================
+          PROGRESS
+      ====================================== */}
 
       <ProgressStepper
         step={currentStep}
       />
 
-
-      {/* =================================================
-          CATEGORY SECTION
-      ================================================= */}
+      {/* ======================================
+          CATEGORY
+      ====================================== */}
 
       <section className="categorySection">
 
@@ -629,18 +784,16 @@ const DynamicForms = () => {
           </h2>
 
           <p>
-            Select the insurance claim template that
-            matches your incident.
+            Select the insurance claim template
+            that matches your incident.
           </p>
 
         </div>
-
 
         <div className="categoryGrid">
 
           {insuranceCategories.map(
             (category) => (
-
               <CategoryCard
                 key={category.id}
                 category={category}
@@ -654,7 +807,6 @@ const DynamicForms = () => {
                   )
                 }
               />
-
             )
           )}
 
@@ -662,10 +814,9 @@ const DynamicForms = () => {
 
       </section>
 
-
-      {/* =================================================
+      {/* ======================================
           APPLICATION MODE
-      ================================================= */}
+      ====================================== */}
 
       <section className="modeSection">
 
@@ -676,18 +827,14 @@ const DynamicForms = () => {
           </h2>
 
           <p>
-
-            Forma AI supports AI-assisted applications,
-            manual applications, image OCR and PDF
-            extraction.
-
+            Forma AI supports AI-assisted
+            applications, manual applications,
+            image OCR and PDF extraction.
           </p>
 
         </div>
 
-
         <div className="modeGrid">
-
 
           <div
             className={
@@ -696,13 +843,12 @@ const DynamicForms = () => {
                 : "modeCard"
             }
             onClick={() =>
-              setApplicationMode("manual")
+              setApplicationMode(
+                "manual"
+              )
             }
           >
-
-            <FaKeyboard
-              className="modeIcon"
-            />
+            <FaKeyboard className="modeIcon" />
 
             <h3>
               Manual Application
@@ -711,9 +857,7 @@ const DynamicForms = () => {
             <p>
               Fill insurance forms manually.
             </p>
-
           </div>
-
 
           <div
             className={
@@ -725,10 +869,7 @@ const DynamicForms = () => {
               setApplicationMode("ai")
             }
           >
-
-            <FaRobot
-              className="modeIcon"
-            />
+            <FaRobot className="modeIcon" />
 
             <h3>
               AI Auto Fill
@@ -737,9 +878,7 @@ const DynamicForms = () => {
             <p>
               Paste your incident description.
             </p>
-
           </div>
-
 
           <div
             className={
@@ -751,10 +890,7 @@ const DynamicForms = () => {
               setApplicationMode("image")
             }
           >
-
-            <FaCamera
-              className="modeIcon"
-            />
+            <FaCamera className="modeIcon" />
 
             <h3>
               Image Upload
@@ -763,9 +899,7 @@ const DynamicForms = () => {
             <p>
               Upload accident photos for OCR.
             </p>
-
           </div>
-
 
           <div
             className={
@@ -777,10 +911,7 @@ const DynamicForms = () => {
               setApplicationMode("pdf")
             }
           >
-
-            <FaFilePdf
-              className="modeIcon"
-            />
+            <FaFilePdf className="modeIcon" />
 
             <h3>
               PDF Upload
@@ -789,38 +920,31 @@ const DynamicForms = () => {
             <p>
               Upload FIR, Bills, Medical Reports.
             </p>
-
           </div>
-
 
         </div>
 
       </section>
 
-
-      {/* =================================================
+      {/* ======================================
           AI / IMAGE / PDF UPLOADER
-      ================================================= */}
+      ====================================== */}
 
       {(applicationMode === "ai" ||
         applicationMode === "image" ||
         applicationMode === "pdf") && (
-
         <AIUploader
           mode={applicationMode}
         />
-
       )}
 
-
-      {/* =================================================
-          MANUAL FORM SECTION
-      ================================================= */}
+      {/* ======================================
+          MANUAL FORM
+      ====================================== */}
 
       {applicationMode === "manual" && (
 
         <section className="manualSection">
-
 
           <div className="manualHeader">
 
@@ -831,31 +955,22 @@ const DynamicForms = () => {
               </h2>
 
               <p>
-
                 Selected Category :
-
                 <strong>
                   {" "}
                   {selectedCategory.toUpperCase()}
                 </strong>
-
               </p>
 
             </div>
 
-
             <span className="manualBadge">
-
               AI Smart Validation Enabled
-
             </span>
 
           </div>
 
-
-          {/* ============================================
-              COMMON APPLICANT INFORMATION
-          ============================================ */}
+          {/* COMMON APPLICANT INFORMATION */}
 
           <div className="commonCard">
 
@@ -863,9 +978,7 @@ const DynamicForms = () => {
               Applicant Information
             </h3>
 
-
             <div className="grid2">
-
 
               <div className="inputGroup">
 
@@ -886,7 +999,6 @@ const DynamicForms = () => {
 
               </div>
 
-
               <div className="inputGroup">
 
                 <label>
@@ -902,11 +1014,10 @@ const DynamicForms = () => {
                   onChange={
                     handleChange
                   }
-                  placeholder="mahesh@email.com"
+                  placeholder="email@example.com"
                 />
 
               </div>
-
 
               <div className="inputGroup">
 
@@ -928,7 +1039,6 @@ const DynamicForms = () => {
 
               </div>
 
-
               <div className="inputGroup">
 
                 <label>
@@ -948,9 +1058,7 @@ const DynamicForms = () => {
 
               </div>
 
-
             </div>
-
 
             <div className="inputGroup fullWidth">
 
@@ -974,10 +1082,7 @@ const DynamicForms = () => {
 
           </div>
 
-
-          {/* ============================================
-              SELECTED CATEGORY FORM
-          ============================================ */}
+          {/* CATEGORY FORM */}
 
           <ManualForm
             category={selectedCategory}
@@ -986,62 +1091,138 @@ const DynamicForms = () => {
             }
           />
 
+          {/* ====================================
+              STATUS
+          ==================================== */}
 
-          {/* ============================================
-              BACKEND STATUS
-          ============================================ */}
-
-          {(message || error || loading) && (
+          {(message ||
+            error ||
+            loading) && (
 
             <div className="claimStatus">
 
               {loading && (
-
                 <div className="statusLoading">
-                  Saving claim...
+                  Processing claim...
                 </div>
-
               )}
 
-              {message && !loading && (
+              {message &&
+                !loading && (
+                  <div className="statusSuccess">
 
-                <div className="statusSuccess">
+                    <FaCheckCircle />
 
-                  <FaCheckCircle />
+                    <span>
+                      {message}
+                    </span>
 
-                  <span>
-                    {message}
-                  </span>
+                  </div>
+                )}
 
-                </div>
+              {error &&
+                !loading && (
+                  <div className="statusError">
 
-              )}
+                    <span>
+                      {error}
+                    </span>
 
-              {error && !loading && (
+                  </div>
+                )}
 
-                <div className="statusError">
+            </div>
+          )}
 
-                  <span>
-                    {error}
-                  </span>
+        </section>
+      )}
 
-                </div>
+      {/* ======================================
+          GENERATED PDF
+      ====================================== */}
 
-              )}
+      {showPdf &&
+        pdfUrl && (
+
+          <section className="generatedPdfSection">
+
+            <div className="generatedPdfHeader">
+
+              <div>
+
+                <h2>
+                  Claim PDF Generated
+                </h2>
+
+                <p>
+                  Your submitted insurance
+                  claim has been converted
+                  into a PDF document.
+                </p>
+
+                {claimNumber && (
+                  <strong>
+                    Claim Number:{" "}
+                    {claimNumber}
+                  </strong>
+                )}
+
+              </div>
+
+              <div className="pdfActionButtons">
+
+                <button
+                  type="button"
+                  className="pdfDownloadBtn"
+                  onClick={
+                    handleDownloadPDF
+                  }
+                >
+                  <FaDownload />
+                  Download PDF
+                </button>
+
+                <button
+                  type="button"
+                  className="pdfOpenBtn"
+                  onClick={
+                    handleOpenPDF
+                  }
+                >
+                  <FaEye />
+                  Open PDF
+                </button>
+
+                <button
+                  type="button"
+                  className="pdfCloseBtn"
+                  onClick={() =>
+                    setShowPdf(false)
+                  }
+                >
+                  <FaTimes />
+                </button>
+
+              </div>
 
             </div>
 
-          )}
+            <div className="pdfViewerCard">
 
+              <iframe
+                src={pdfUrl}
+                title="Forma AI Insurance Claim PDF"
+                className="claimPdfViewer"
+              />
 
-        </section>
+            </div>
 
-      )}
+          </section>
+        )}
 
-
-      {/* =================================================
-          AI SMART FEATURES
-      ================================================= */}
+      {/* ======================================
+          FEATURES
+      ====================================== */}
 
       <section className="featuresSection">
 
@@ -1053,33 +1234,26 @@ const DynamicForms = () => {
 
         </div>
 
-
         <div className="featureGrid">
-
 
           <div className="featureCard">
 
-            <FaRobot
-              className="featureIcon"
-            />
+            <FaRobot className="featureIcon" />
 
             <h4>
               AI Incident Parser
             </h4>
 
             <p>
-              Converts natural language into
-              structured insurance fields.
+              Converts natural language
+              into structured insurance fields.
             </p>
 
           </div>
 
-
           <div className="featureCard">
 
-            <FaCamera
-              className="featureIcon"
-            />
+            <FaCamera className="featureIcon" />
 
             <h4>
               Image OCR
@@ -1092,12 +1266,9 @@ const DynamicForms = () => {
 
           </div>
 
-
           <div className="featureCard">
 
-            <FaFilePdf
-              className="featureIcon"
-            />
+            <FaFilePdf className="featureIcon" />
 
             <h4>
               PDF Extraction
@@ -1105,35 +1276,29 @@ const DynamicForms = () => {
 
             <p>
               Read FIR, Hospital Bills,
-              Medical Reports and Insurance PDFs.
+              Medical Reports and PDFs.
             </p>
 
           </div>
 
-
           <div className="featureCard">
 
-            <FaMagic
-              className="featureIcon"
-            />
+            <FaMagic className="featureIcon" />
 
             <h4>
               Smart Validation
             </h4>
 
             <p>
-              AI validates missing fields
+              AI validates missing information
               before submission.
             </p>
 
           </div>
 
-
           <div className="featureCard">
 
-            <FaCheckCircle
-              className="featureIcon"
-            />
+            <FaCheckCircle className="featureIcon" />
 
             <h4>
               Confidence Score
@@ -1146,12 +1311,9 @@ const DynamicForms = () => {
 
           </div>
 
-
           <div className="featureCard">
 
-            <FaClipboardList
-              className="featureIcon"
-            />
+            <FaClipboardList className="featureIcon" />
 
             <h4>
               Save Draft Anytime
@@ -1164,15 +1326,13 @@ const DynamicForms = () => {
 
           </div>
 
-
         </div>
 
       </section>
 
-
-      {/* =================================================
-          REVIEW CARD
-      ================================================= */}
+      {/* ======================================
+          REVIEW
+      ====================================== */}
 
       <section className="reviewSection">
 
@@ -1182,12 +1342,9 @@ const DynamicForms = () => {
             Review & Submit
           </h2>
 
-
           <div className="reviewGrid">
 
-
             <div>
-
               <span>
                 Insurance Category
               </span>
@@ -1195,12 +1352,9 @@ const DynamicForms = () => {
               <h4>
                 {selectedCategory.toUpperCase()}
               </h4>
-
             </div>
 
-
             <div>
-
               <span>
                 Application Mode
               </span>
@@ -1208,12 +1362,9 @@ const DynamicForms = () => {
               <h4>
                 {applicationMode.toUpperCase()}
               </h4>
-
             </div>
 
-
             <div>
-
               <span>
                 Applicant
               </span>
@@ -1227,12 +1378,9 @@ const DynamicForms = () => {
                   categoryFormData.policyHolderName ||
                   "Not Filled"}
               </h4>
-
             </div>
 
-
             <div>
-
               <span>
                 Policy Number
               </span>
@@ -1242,29 +1390,22 @@ const DynamicForms = () => {
                   formData.policyNumber ||
                   "Not Filled"}
               </h4>
-
             </div>
 
-
             <div>
-
               <span>
                 Claim Status
               </span>
 
               <h4>
                 {claimId
-                  ? "Draft Created"
+                  ? "Claim Created"
                   : "Not Saved"}
               </h4>
-
             </div>
 
-
             {claimId && (
-
               <div>
-
                 <span>
                   Claim ID
                 </span>
@@ -1272,11 +1413,20 @@ const DynamicForms = () => {
                 <h4>
                   {claimId}
                 </h4>
-
               </div>
-
             )}
 
+            {claimNumber && (
+              <div>
+                <span>
+                  Claim Number
+                </span>
+
+                <h4>
+                  {claimNumber}
+                </h4>
+              </div>
+            )}
 
           </div>
 
@@ -1284,13 +1434,11 @@ const DynamicForms = () => {
 
       </section>
 
-
-      {/* =================================================
+      {/* ======================================
           ACTION BUTTONS
-      ================================================= */}
+      ====================================== */}
 
       <section className="actionSection">
-
 
         <button
           className="outlineBtn"
@@ -1301,11 +1449,8 @@ const DynamicForms = () => {
           }
           type="button"
         >
-
           Previous
-
         </button>
-
 
         <button
           className="saveBtn"
@@ -1313,33 +1458,24 @@ const DynamicForms = () => {
           disabled={loading}
           type="button"
         >
-
           <FaSave />
 
           {loading
             ? "Saving..."
             : "Save Draft"}
-
         </button>
 
-
         {currentStep < 5 && (
-
           <button
             className="nextBtn"
             onClick={nextStep}
             disabled={loading}
             type="button"
           >
-
             Continue
-
             <FaArrowRight />
-
           </button>
-
         )}
-
 
         <button
           className="submitBtn"
@@ -1347,22 +1483,18 @@ const DynamicForms = () => {
           disabled={loading}
           type="button"
         >
-
           <FaPaperPlane />
 
           {loading
             ? "Submitting..."
             : "Submit Claim"}
-
         </button>
-
 
       </section>
 
-
-      {/* =================================================
-          AI SMART SUGGESTIONS
-      ================================================= */}
+      {/* ======================================
+          SMART SUGGESTIONS
+      ====================================== */}
 
       <section className="tipsSection">
 
@@ -1370,91 +1502,68 @@ const DynamicForms = () => {
           Forma AI Smart Suggestions
         </h2>
 
-
         <div className="tipsGrid">
 
-
           <div className="tipCard">
-
             <FaRobot />
 
             <p>
               Upload accident photos for
               AI damage detection.
             </p>
-
           </div>
 
-
           <div className="tipCard">
-
             <FaFilePdf />
 
             <p>
               Upload FIR or Medical Bills
               to auto-fill claim details.
             </p>
-
           </div>
 
-
           <div className="tipCard">
-
             <FaCheckCircle />
 
             <p>
               AI checks missing information
               before submission.
             </p>
-
           </div>
 
-
           <div className="tipCard">
-
             <FaHeartbeat />
 
             <p>
               Health insurance claims support
               OCR prescriptions and bills.
             </p>
-
           </div>
 
-
           <div className="tipCard">
-
             <FaCarCrash />
 
             <p>
               Vehicle claims support RC,
-              DL, Police FIR and repair estimates.
+              DL, Police FIR and estimates.
             </p>
-
           </div>
 
-
           <div className="tipCard">
-
             <FaShieldAlt />
 
             <p>
               Life insurance claims support
               nominee verification documents.
             </p>
-
           </div>
-
 
         </div>
 
       </section>
 
     </div>
-
   );
 };
 
-
 export default DynamicForms;
-

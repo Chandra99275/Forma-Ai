@@ -16,7 +16,7 @@ const claimSchema = new mongoose.Schema(
 
     claimNumber: {
       type: String,
-      required: true,
+      required: [true, "Claim number is required."],
       unique: true,
       trim: true,
     },
@@ -37,14 +37,20 @@ const claimSchema = new mongoose.Schema(
 
     category: {
       type: String,
-      required: true,
-      enum: [
-        "health",
-        "vehicle",
-        "property",
-        "travel",
-        "life",
-      ],
+      required: [true, "Insurance category is required."],
+      enum: {
+        values: [
+          "health",
+          "vehicle",
+          "property",
+          "travel",
+          "life",
+        ],
+        message:
+          "Invalid insurance category: {VALUE}.",
+      },
+      lowercase: true,
+      trim: true,
     },
 
     // --------------------------------------
@@ -53,46 +59,76 @@ const claimSchema = new mongoose.Schema(
 
     status: {
       type: String,
-      enum: [
-        "draft",
-        "submitted",
-        "under_review",
-        "approved",
-        "rejected",
-      ],
+      enum: {
+        values: [
+          "draft",
+          "submitted",
+          "under_review",
+          "approved",
+          "rejected",
+        ],
+        message:
+          "Invalid claim status: {VALUE}.",
+      },
       default: "draft",
     },
 
     // --------------------------------------
     // Dynamic Form Data
     // --------------------------------------
+    //
+    // This stores the complete dynamic insurance
+    // form submitted by the user.
+    //
+    // Example:
+    // {
+    //   policyNumber: "POL123",
+    //   vehicleNumber: "TS09AB1234",
+    //   accidentDate: "...",
+    //   damageType: "Windshield"
+    // }
+    //
 
     claimData: {
       type: mongoose.Schema.Types.Mixed,
-      default: {},
+      default: () => ({}),
     },
 
     // --------------------------------------
     // Uploaded Documents
     // --------------------------------------
+    //
+    // Document records are stored separately
+    // in the Document collection.
+    //
 
-    documents: [
-      {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "Document",
-      },
-    ],
+    documents: {
+      type: [
+        {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "Document",
+        },
+      ],
+      default: [],
+    },
 
     // --------------------------------------
     // AI Analysis
     // --------------------------------------
+    //
+    // AI analysis records are stored separately
+    // in the AIAnalysis collection.
+    //
 
-    aiAnalysis: [
-      {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "AIAnalysis",
-      },
-    ],
+    aiAnalysis: {
+      type: [
+        {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "AIAnalysis",
+        },
+      ],
+      default: [],
+    },
 
     // --------------------------------------
     // AI Summary
@@ -101,6 +137,7 @@ const claimSchema = new mongoose.Schema(
     aiSummary: {
       type: String,
       default: "",
+      trim: true,
     },
 
     // --------------------------------------
@@ -109,8 +146,8 @@ const claimSchema = new mongoose.Schema(
 
     aiConfidence: {
       type: Number,
-      min: 0,
-      max: 1,
+      min: [0, "AI confidence cannot be less than 0."],
+      max: [1, "AI confidence cannot be greater than 1."],
       default: null,
     },
 
@@ -120,8 +157,8 @@ const claimSchema = new mongoose.Schema(
 
     riskScore: {
       type: Number,
-      min: 0,
-      max: 1,
+      min: [0, "Risk score cannot be less than 0."],
+      max: [1, "Risk score cannot be greater than 1."],
       default: null,
     },
 
@@ -131,12 +168,16 @@ const claimSchema = new mongoose.Schema(
 
     riskLevel: {
       type: String,
-      enum: [
-        "low",
-        "medium",
-        "high",
-        "unknown",
-      ],
+      enum: {
+        values: [
+          "low",
+          "medium",
+          "high",
+          "unknown",
+        ],
+        message:
+          "Invalid risk level: {VALUE}.",
+      },
       default: "unknown",
     },
 
@@ -147,6 +188,7 @@ const claimSchema = new mongoose.Schema(
     reviewerNotes: {
       type: String,
       default: "",
+      trim: true,
     },
 
     reviewedBy: {
@@ -176,6 +218,7 @@ const claimSchema = new mongoose.Schema(
     decisionReason: {
       type: String,
       default: "",
+      trim: true,
     },
 
     decisionDate: {
@@ -192,25 +235,63 @@ const claimSchema = new mongoose.Schema(
 // Indexes
 // ==========================================
 
+// User claims
 claimSchema.index({
   userId: 1,
   createdAt: -1,
 });
 
+// Category + status filtering
 claimSchema.index({
   category: 1,
   status: 1,
 });
+
+// Claim number lookup
+//
+// NOTE:
+// claimNumber already has unique: true,
+// which creates a unique index.
+// This explicit index is kept here because
+// the existing project may already depend on it.
 
 claimSchema.index({
   claimNumber: 1,
 });
 
 // ==========================================
+// Pre-validation Logging
+// ==========================================
+//
+// This helps us identify exactly what MongoDB
+// is validating when a claim creation fails.
+//
+
+claimSchema.pre("validate", function (next) {
+  console.log("\n-----------------------------------------");
+  console.log("🔍 CLAIM MODEL VALIDATION");
+  console.log("-----------------------------------------");
+  console.log("Claim Number:", this.claimNumber);
+  console.log("User ID:", this.userId || "Guest");
+  console.log("Category:", this.category);
+  console.log("Status:", this.status);
+  console.log(
+    "Claim Data:",
+    this.claimData
+  );
+  console.log("-----------------------------------------\n");
+
+  next();
+});
+
+// ==========================================
 // Create Model
 // ==========================================
 
-const Claim = mongoose.model("Claim", claimSchema);
+const Claim = mongoose.model(
+  "Claim",
+  claimSchema
+);
 
 // ==========================================
 // Export Model

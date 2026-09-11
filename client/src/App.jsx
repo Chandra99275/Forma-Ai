@@ -1,3 +1,4 @@
+
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 
 // ================= PAGES =================
@@ -29,14 +30,27 @@ function App() {
       <Routes>
 
         {/* ================= LANDING PAGE ================= */}
-        <Route path="/" element={<Home />} />
+        <Route
+          path="/"
+          element={<Home />}
+        />
 
         {/* ================= AUTHENTICATION ================= */}
-        <Route path="/login" element={<Login />} />
-        <Route path="/signup" element={<Signup />} />
+        <Route
+          path="/login"
+          element={<Login />}
+        />
+
+        <Route
+          path="/signup"
+          element={<Signup />}
+        />
 
         {/* ================= USER DASHBOARD ================= */}
-        <Route path="/dashboard" element={<UserDashboard />} />
+        <Route
+          path="/dashboard"
+          element={<UserDashboard />}
+        />
 
         {/* ================= DYNAMIC INSURANCE FORMS ================= */}
         <Route

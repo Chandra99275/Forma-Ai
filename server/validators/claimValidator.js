@@ -5,10 +5,10 @@
 import mongoose from "mongoose";
 
 // ==========================================
-// Allowed Values
+// Allowed Categories
 // ==========================================
 
-const allowedCategories = [
+const ALLOWED_CATEGORIES = [
   "health",
   "vehicle",
   "property",
@@ -16,53 +16,108 @@ const allowedCategories = [
   "life",
 ];
 
-const allowedStatuses = [
-  "draft",
-  "submitted",
-  "under_review",
-  "approved",
-  "rejected",
-];
-
 // ==========================================
 // Validate Create Claim
+// POST /api/claims
 // ==========================================
 
 const validateCreateClaim = (req, res, next) => {
-  const { category, claimData } = req.body;
+  console.log("\n=========================================");
+  console.log("🔎 VALIDATE CREATE CLAIM");
+  console.log("=========================================");
+  console.log(
+    "Request Body:",
+    JSON.stringify(req.body, null, 2)
+  );
+  console.log("=========================================");
+
+  const { category, claimData } = req.body || {};
+
+  // ----------------------------------------
+  // Category validation
+  // ----------------------------------------
 
   if (!category) {
+    console.error(
+      "❌ Validation failed: category missing"
+    );
+
     return res.status(400).json({
       success: false,
-      message: "Claim category is required",
+      message: "Insurance category is required.",
     });
   }
 
-  if (!allowedCategories.includes(category)) {
-    return res.status(400).json({
-      success: false,
-      message: `Invalid claim category. Allowed categories: ${allowedCategories.join(
-        ", "
-      )}`,
-    });
-  }
-
-  if (!claimData) {
-    return res.status(400).json({
-      success: false,
-      message: "Claim data is required",
-    });
-  }
+  const normalizedCategory = String(category)
+    .trim()
+    .toLowerCase();
 
   if (
-    typeof claimData !== "object" ||
-    Array.isArray(claimData)
+    !ALLOWED_CATEGORIES.includes(
+      normalizedCategory
+    )
   ) {
+    console.error(
+      "❌ Validation failed: invalid category:",
+      normalizedCategory
+    );
+
     return res.status(400).json({
       success: false,
-      message: "claimData must be a valid object",
+      message: "Invalid insurance category.",
+      received: normalizedCategory,
+      allowed: ALLOWED_CATEGORIES,
     });
   }
+
+  // ----------------------------------------
+  // claimData validation
+  // ----------------------------------------
+
+  // claimData is optional when creating a draft.
+  if (claimData !== undefined) {
+    if (
+      typeof claimData !== "object" ||
+      claimData === null ||
+      Array.isArray(claimData)
+    ) {
+      console.error(
+        "❌ Validation failed: invalid claimData"
+      );
+
+      return res.status(400).json({
+        success: false,
+        message:
+          "claimData must be a valid object.",
+      });
+    }
+  }
+
+  // ----------------------------------------
+  // Normalize request body
+  // ----------------------------------------
+
+  req.body.category = normalizedCategory;
+
+  if (claimData === undefined) {
+    req.body.claimData = {};
+  }
+
+  console.log(
+    "✅ Claim validation passed"
+  );
+
+  console.log(
+    "Category:",
+    req.body.category
+  );
+
+  console.log(
+    "Claim data keys:",
+    Object.keys(req.body.claimData)
+  );
+
+  console.log("=========================================\n");
 
   next();
 };
@@ -72,66 +127,26 @@ const validateCreateClaim = (req, res, next) => {
 // ==========================================
 
 const validateUpdateClaim = (req, res, next) => {
-  const {
-    claimData,
-    documents,
-    status,
-  } = req.body;
+  console.log("\n🔎 VALIDATE UPDATE CLAIM");
 
-  // At least one field must be provided
+  const { claimData } = req.body || {};
+
   if (
-    claimData === undefined &&
-    documents === undefined &&
-    status === undefined
+    claimData === undefined
+  ) {
+    req.body.claimData = {};
+    return next();
+  }
+
+  if (
+    typeof claimData !== "object" ||
+    claimData === null ||
+    Array.isArray(claimData)
   ) {
     return res.status(400).json({
       success: false,
       message:
-        "At least one field is required to update the claim",
-    });
-  }
-
-  // Validate claimData
-  if (
-    claimData !== undefined &&
-    (typeof claimData !== "object" ||
-      Array.isArray(claimData))
-  ) {
-    return res.status(400).json({
-      success: false,
-      message: "claimData must be a valid object",
-    });
-  }
-
-  // Validate documents
-  if (documents !== undefined) {
-    if (!Array.isArray(documents)) {
-      return res.status(400).json({
-        success: false,
-        message: "documents must be an array",
-      });
-    }
-
-    for (const documentId of documents) {
-      if (!mongoose.Types.ObjectId.isValid(documentId)) {
-        return res.status(400).json({
-          success: false,
-          message: `Invalid document ID: ${documentId}`,
-        });
-      }
-    }
-  }
-
-  // Validate status
-  if (
-    status !== undefined &&
-    !allowedStatuses.includes(status)
-  ) {
-    return res.status(400).json({
-      success: false,
-      message: `Invalid status. Allowed statuses: ${allowedStatuses.join(
-        ", "
-      )}`,
+        "claimData must be a valid object.",
     });
   }
 
@@ -145,10 +160,22 @@ const validateUpdateClaim = (req, res, next) => {
 const validateClaimId = (req, res, next) => {
   const { id } = req.params;
 
-  if (!id || !mongoose.Types.ObjectId.isValid(id)) {
+  console.log(
+    "🔎 Validating Claim ID:",
+    id
+  );
+
+  if (!id) {
     return res.status(400).json({
       success: false,
-      message: "Invalid claim ID",
+      message: "Claim ID is required.",
+    });
+  }
+
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return res.status(400).json({
+      success: false,
+      message: "Invalid claim ID.",
     });
   }
 
@@ -159,23 +186,51 @@ const validateClaimId = (req, res, next) => {
 // Validate Claim Category
 // ==========================================
 
-const validateClaimCategory = (req, res, next) => {
+const validateClaimCategory = (
+  req,
+  res,
+  next
+) => {
   const { category } = req.params;
 
-  if (!allowedCategories.includes(category)) {
+  console.log(
+    "🔎 Validating Category:",
+    category
+  );
+
+  if (!category) {
     return res.status(400).json({
       success: false,
-      message: `Invalid claim category. Allowed categories: ${allowedCategories.join(
-        ", "
-      )}`,
+      message:
+        "Insurance category is required.",
     });
   }
+
+  const normalizedCategory = String(category)
+    .trim()
+    .toLowerCase();
+
+  if (
+    !ALLOWED_CATEGORIES.includes(
+      normalizedCategory
+    )
+  ) {
+    return res.status(400).json({
+      success: false,
+      message:
+        "Invalid insurance category.",
+      allowed: ALLOWED_CATEGORIES,
+    });
+  }
+
+  req.params.category =
+    normalizedCategory;
 
   next();
 };
 
 // ==========================================
-// Named Exports
+// Export
 // ==========================================
 
 export {
@@ -183,6 +238,4 @@ export {
   validateUpdateClaim,
   validateClaimId,
   validateClaimCategory,
-  allowedCategories,
-  allowedStatuses,
 };

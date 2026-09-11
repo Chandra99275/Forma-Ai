@@ -1,11 +1,17 @@
 
 // ==========================================
 // Forma AI - Submissions Page
-// Backend Connected Version
+// Backend + PDF Connected Version
 // ==========================================
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, {
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+
 import { NavLink } from "react-router-dom";
+
 import "./Submissions.css";
 
 import {
@@ -30,12 +36,23 @@ import {
   FaUserShield,
   FaTimes,
   FaSpinner,
+  FaFilePdf,
 } from "react-icons/fa";
+
+// ==========================================
+// Backend API
+// ==========================================
 
 import {
   getClaims,
   getClaimById,
 } from "../services/claimService";
+
+// ==========================================
+// PDF Generator
+// ==========================================
+
+import { generateClaimPDF } from "../services/pdfService";
 
 // ==========================================
 // Insurance Icon
@@ -68,7 +85,9 @@ const getIcon = (type) => {
 // ==========================================
 
 const formatType = (category) => {
-  if (!category) return "Unknown";
+  if (!category) {
+    return "Unknown";
+  }
 
   return (
     category.charAt(0).toUpperCase() +
@@ -107,7 +126,9 @@ const getFormName = (category) => {
 // ==========================================
 
 const formatStatus = (status) => {
-  if (!status) return "Draft";
+  if (!status) {
+    return "Draft";
+  }
 
   switch (status) {
     case "draft":
@@ -128,7 +149,9 @@ const formatStatus = (status) => {
     default:
       return status
         .replace(/_/g, " ")
-        .replace(/\b\w/g, (char) => char.toUpperCase());
+        .replace(/\b\w/g, (char) =>
+          char.toUpperCase()
+        );
   }
 };
 
@@ -196,15 +219,15 @@ const getConfidence = (claim) => {
     typeof claim.aiConfidence === "number" &&
     !Number.isNaN(claim.aiConfidence)
   ) {
-    return Math.round(claim.aiConfidence * 100);
-  }
+    if (claim.aiConfidence <= 1) {
+      return Math.round(
+        claim.aiConfidence * 100
+      );
+    }
 
-  // If backend stores confidence directly as 0-100
-  if (
-    typeof claim.aiConfidence === "number" &&
-    claim.aiConfidence > 1
-  ) {
-    return Math.round(claim.aiConfidence);
+    return Math.round(
+      claim.aiConfidence
+    );
   }
 
   return null;
@@ -216,31 +239,48 @@ const getConfidence = (claim) => {
 
 const normalizeClaim = (claim) => {
   const formattedDate = formatDate(
-    claim.submittedAt || claim.createdAt
+    claim.submittedAt ||
+      claim.createdAt
   );
 
-  const type = formatType(claim.category);
+  const type = formatType(
+    claim.category
+  );
 
   return {
-    id: claim.claimNumber || claim._id,
+    id:
+      claim.claimNumber ||
+      claim._id,
 
-    databaseId: claim._id,
+    databaseId:
+      claim._id,
 
-    form: getFormName(claim.category),
+    form:
+      getFormName(
+        claim.category
+      ),
 
     type,
 
-    customer: getCustomerName(claim),
+    customer:
+      getCustomerName(claim),
 
-    status: formatStatus(claim.status),
+    status:
+      formatStatus(
+        claim.status
+      ),
 
-    confidence: getConfidence(claim),
+    confidence:
+      getConfidence(claim),
 
-    date: formattedDate.date,
+    date:
+      formattedDate.date,
 
-    time: formattedDate.time,
+    time:
+      formattedDate.time,
 
-    rawClaim: claim,
+    rawClaim:
+      claim,
   };
 };
 
@@ -253,23 +293,62 @@ const Submissions = () => {
   // State
   // ========================================
 
-  const [submissions, setSubmissions] = useState([]);
+  const [
+    submissions,
+    setSubmissions,
+  ] = useState([]);
 
-  const [search, setSearch] = useState("");
+  const [
+    search,
+    setSearch,
+  ] = useState("");
 
-  const [statusFilter, setStatusFilter] = useState("All");
+  const [
+    statusFilter,
+    setStatusFilter,
+  ] = useState("All");
 
-  const [typeFilter, setTypeFilter] = useState("All");
+  const [
+    typeFilter,
+    setTypeFilter,
+  ] = useState("All");
 
-  const [selectedSubmission, setSelectedSubmission] =
-    useState(null);
+  const [
+    selectedSubmission,
+    setSelectedSubmission,
+  ] = useState(null);
 
-  const [loading, setLoading] = useState(true);
+  const [
+    loading,
+    setLoading,
+  ] = useState(true);
 
-  const [error, setError] = useState("");
+  const [
+    error,
+    setError,
+  ] = useState("");
 
   // ========================================
-  // Fetch Claims From Backend
+  // PDF State
+  // ========================================
+
+  const [
+    pdfUrl,
+    setPdfUrl,
+  ] = useState("");
+
+  const [
+    pdfFileName,
+    setPdfFileName,
+  ] = useState("");
+
+  const [
+    generatingPdf,
+    setGeneratingPdf,
+  ] = useState(false);
+
+  // ========================================
+  // Load Claims
   // ========================================
 
   const loadSubmissions = async () => {
@@ -277,22 +356,38 @@ const Submissions = () => {
       setLoading(true);
       setError("");
 
-      const result = await getClaims();
+      const result =
+        await getClaims();
 
-      console.log("📦 Claims received from backend:", result);
+      console.log(
+        "📦 Claims received from backend:",
+        result
+      );
 
-      const claims = Array.isArray(result)
-        ? result
-        : result.claims || result.data || [];
+      const claims =
+        Array.isArray(result)
+          ? result
+          : result?.claims ||
+            result?.data ||
+            [];
 
-      const normalizedClaims = claims.map(normalizeClaim);
+      const normalizedClaims =
+        claims.map(
+          normalizeClaim
+        );
 
-      setSubmissions(normalizedClaims);
+      setSubmissions(
+        normalizedClaims
+      );
     } catch (err) {
-      console.error("❌ Failed to load submissions:", err);
+      console.error(
+        "❌ Failed to load submissions:",
+        err
+      );
 
       setError(
-        err.message || "Unable to load submissions from backend."
+        err.message ||
+          "Unable to load submissions from backend."
       );
     } finally {
       setLoading(false);
@@ -300,7 +395,7 @@ const Submissions = () => {
   };
 
   // ========================================
-  // Load Claims When Page Opens
+  // Load When Page Opens
   // ========================================
 
   useEffect(() => {
@@ -308,139 +403,413 @@ const Submissions = () => {
   }, []);
 
   // ========================================
-  // Filtering
+  // Search + Filters
   // ========================================
 
-  const filteredSubmissions = useMemo(() => {
-    return submissions.filter((submission) => {
-      const searchValue = search.toLowerCase();
+  const filteredSubmissions =
+    useMemo(() => {
+      return submissions.filter(
+        (submission) => {
+          const searchValue =
+            search.toLowerCase();
 
-      const matchesSearch =
-        submission.form
-          .toLowerCase()
-          .includes(searchValue) ||
-        submission.customer
-          .toLowerCase()
-          .includes(searchValue) ||
-        submission.id
-          .toLowerCase()
-          .includes(searchValue);
+          const matchesSearch =
+            submission.form
+              .toLowerCase()
+              .includes(searchValue) ||
+            submission.customer
+              .toLowerCase()
+              .includes(searchValue) ||
+            submission.id
+              .toLowerCase()
+              .includes(searchValue);
 
-      const matchesStatus =
-        statusFilter === "All" ||
-        submission.status === statusFilter;
+          const matchesStatus =
+            statusFilter === "All" ||
+            submission.status ===
+              statusFilter;
 
-      const matchesType =
-        typeFilter === "All" ||
-        submission.type === typeFilter;
+          const matchesType =
+            typeFilter === "All" ||
+            submission.type ===
+              typeFilter;
 
-      return matchesSearch && matchesStatus && matchesType;
-    });
-  }, [
-    submissions,
-    search,
-    statusFilter,
-    typeFilter,
-  ]);
+          return (
+            matchesSearch &&
+            matchesStatus &&
+            matchesType
+          );
+        }
+      );
+    }, [
+      submissions,
+      search,
+      statusFilter,
+      typeFilter,
+    ]);
 
   // ========================================
   // Statistics
   // ========================================
 
-  const totalSubmissions = submissions.length;
+  const totalSubmissions =
+    submissions.length;
 
-  const approvedCount = submissions.filter(
-    (item) => item.status === "Approved"
-  ).length;
+  const approvedCount =
+    submissions.filter(
+      (item) =>
+        item.status ===
+        "Approved"
+    ).length;
 
-  const pendingCount = submissions.filter(
-    (item) =>
-      item.status === "Pending" ||
-      item.status === "Submitted" ||
-      item.status === "Under Review"
-  ).length;
+  const pendingCount =
+    submissions.filter(
+      (item) =>
+        item.status ===
+          "Submitted" ||
+        item.status ===
+          "Under Review" ||
+        item.status ===
+          "Pending"
+    ).length;
 
-  const rejectedCount = submissions.filter(
-    (item) => item.status === "Rejected"
-  ).length;
+  const rejectedCount =
+    submissions.filter(
+      (item) =>
+        item.status ===
+        "Rejected"
+    ).length;
+
+  // ========================================
+  // Generate PDF
+  // ========================================
+
+  const createPDFForSubmission =
+    async (submission) => {
+      try {
+        setGeneratingPdf(true);
+
+        // Get the most recent claim
+        const result =
+          await getClaimById(
+            submission.databaseId
+          );
+
+        const claim =
+          result?.claim ||
+          result?.data ||
+          result;
+
+        if (
+          !claim ||
+          typeof claim !==
+            "object"
+        ) {
+          throw new Error(
+            "Claim data could not be retrieved."
+          );
+        }
+
+        // Revoke old object URL
+        if (pdfUrl) {
+          URL.revokeObjectURL(
+            pdfUrl
+          );
+        }
+
+        // Generate PDF
+        const generatedPDF =
+          generateClaimPDF({
+            claim,
+            category:
+              claim.category ||
+              submission.type.toLowerCase(),
+
+            claimData:
+              claim.claimData ||
+              {},
+          });
+
+        if (
+          !generatedPDF?.url
+        ) {
+          throw new Error(
+            "PDF generation failed."
+          );
+        }
+
+        setPdfUrl(
+          generatedPDF.url
+        );
+
+        setPdfFileName(
+          generatedPDF.fileName ||
+            `${submission.id}.pdf`
+        );
+
+        // Keep complete claim in selected submission
+        setSelectedSubmission({
+          ...normalizeClaim(
+            claim
+          ),
+          rawClaim:
+            claim,
+          pdfReady:
+            true,
+        });
+
+        return generatedPDF;
+
+      } catch (err) {
+        console.error(
+          "❌ PDF generation failed:",
+          err
+        );
+
+        setSelectedSubmission(
+          (previous) => ({
+            ...(previous ||
+              submission),
+            pdfError:
+              err.message ||
+              "Unable to generate PDF.",
+          })
+        );
+
+        throw err;
+
+      } finally {
+        setGeneratingPdf(
+          false
+        );
+      }
+    };
 
   // ========================================
   // View Submission
   // ========================================
 
-  const handleViewSubmission = async (submission) => {
-    try {
-      setSelectedSubmission({
-        ...submission,
-        loadingDetails: true,
-      });
+  const handleViewSubmission =
+    async (submission) => {
+      try {
+        setSelectedSubmission({
+          ...submission,
+          loadingDetails: true,
+          pdfError: "",
+        });
 
-      const result = await getClaimById(
-        submission.databaseId
-      );
+        // Remove old PDF
+        if (pdfUrl) {
+          URL.revokeObjectURL(
+            pdfUrl
+          );
 
-      const claim =
-        result.claim ||
-        result.data ||
-        result;
+          setPdfUrl("");
+        }
 
-      const normalized = normalizeClaim(claim);
+        setPdfFileName("");
 
-      setSelectedSubmission({
-        ...normalized,
-        loadingDetails: false,
-      });
-    } catch (err) {
-      console.error(
-        "❌ Failed to fetch claim details:",
-        err
-      );
+        // Fetch full claim
+        const result =
+          await getClaimById(
+            submission.databaseId
+          );
 
-      setSelectedSubmission({
-        ...submission,
-        loadingDetails: false,
-        detailsError:
-          err.message || "Unable to load claim details.",
-      });
-    }
-  };
+        const claim =
+          result?.claim ||
+          result?.data ||
+          result;
 
-  // ========================================
-  // Download Submission
-  // ========================================
+        const normalized =
+          normalizeClaim(
+            claim
+          );
 
-  const handleDownload = (submission) => {
-    const claim = submission.rawClaim;
+        setSelectedSubmission({
+          ...normalized,
+          rawClaim:
+            claim,
+          loadingDetails:
+            false,
+          pdfReady: false,
+          pdfError: "",
+        });
 
-    const content = JSON.stringify(
-      claim,
-      null,
-      2
-    );
+        // Automatically generate PDF
+        await createPDFForSubmission({
+          ...normalized,
+          rawClaim:
+            claim,
+        });
 
-    const blob = new Blob(
-      [content],
-      {
-        type: "application/json",
+      } catch (err) {
+        console.error(
+          "❌ Failed to fetch claim details:",
+          err
+        );
+
+        setSelectedSubmission(
+          (previous) => ({
+            ...(previous || {}),
+            ...submission,
+            loadingDetails:
+              false,
+            pdfError:
+              err.message ||
+              "Unable to load claim details.",
+          })
+        );
       }
-    );
+    };
 
-    const url = URL.createObjectURL(blob);
+  // ========================================
+  // Download PDF
+  // ========================================
 
-    const link = document.createElement("a");
+  const handleDownloadPDF =
+    async () => {
+      try {
+        let downloadUrl =
+          pdfUrl;
 
-    link.href = url;
+        let fileName =
+          pdfFileName ||
+          `${selectedSubmission?.id || "forma-ai-claim"}.pdf`;
 
-    link.download = `${submission.id}.json`;
+        // Generate if not available
+        if (!downloadUrl) {
+          const generated =
+            await createPDFForSubmission(
+              selectedSubmission
+            );
 
-    document.body.appendChild(link);
+          downloadUrl =
+            generated.url;
 
-    link.click();
+          fileName =
+            generated.fileName ||
+            fileName;
+        }
 
-    document.body.removeChild(link);
+        if (!downloadUrl) {
+          throw new Error(
+            "PDF URL is not available."
+          );
+        }
 
-    URL.revokeObjectURL(url);
-  };
+        const link =
+          document.createElement(
+            "a"
+          );
+
+        link.href =
+          downloadUrl;
+
+        link.download =
+          fileName;
+
+        document.body.appendChild(
+          link
+        );
+
+        link.click();
+
+        document.body.removeChild(
+          link
+        );
+
+      } catch (err) {
+        console.error(
+          "❌ PDF download failed:",
+          err
+        );
+
+        setSelectedSubmission(
+          (previous) => ({
+            ...(previous || {}),
+            pdfError:
+              err.message ||
+              "Unable to download PDF.",
+          })
+        );
+      }
+    };
+
+  // ========================================
+  // Open PDF
+  // ========================================
+
+  const handleOpenPDF =
+    async () => {
+      try {
+        let url =
+          pdfUrl;
+
+        if (!url) {
+          const generated =
+            await createPDFForSubmission(
+              selectedSubmission
+            );
+
+          url =
+            generated.url;
+        }
+
+        if (!url) {
+          throw new Error(
+            "PDF URL is not available."
+          );
+        }
+
+        window.open(
+          url,
+          "_blank",
+          "noopener,noreferrer"
+        );
+
+      } catch (err) {
+        console.error(
+          "❌ Failed to open PDF:",
+          err
+        );
+      }
+    };
+
+  // ========================================
+  // Close Modal
+  // ========================================
+
+  const handleCloseModal =
+    () => {
+      setSelectedSubmission(
+        null
+      );
+
+      if (pdfUrl) {
+        URL.revokeObjectURL(
+          pdfUrl
+        );
+
+        setPdfUrl("");
+      }
+
+      setPdfFileName("");
+      setGeneratingPdf(false);
+    };
+
+  // ========================================
+  // Cleanup
+  // ========================================
+
+  useEffect(() => {
+    return () => {
+      if (pdfUrl) {
+        URL.revokeObjectURL(
+          pdfUrl
+        );
+      }
+    };
+  }, [pdfUrl]);
 
   // ========================================
   // Render
@@ -463,7 +832,9 @@ const Submissions = () => {
 
           <div>
             <h2>Forma AI</h2>
-            <span>Insurance Intelligence</span>
+            <span>
+              Insurance Intelligence
+            </span>
           </div>
 
         </div>
@@ -477,70 +848,90 @@ const Submissions = () => {
           <li>
             <NavLink
               to="/dashboard"
-              className={({ isActive }) =>
+              className={({
+                isActive,
+              }) =>
                 isActive
                   ? "submission-link active"
                   : "submission-link"
               }
             >
               <FaTachometerAlt />
-              <span>Dashboard</span>
+              <span>
+                Dashboard
+              </span>
             </NavLink>
           </li>
 
           <li>
             <NavLink
               to="/ai-parser"
-              className={({ isActive }) =>
+              className={({
+                isActive,
+              }) =>
                 isActive
                   ? "submission-link active"
                   : "submission-link"
               }
             >
               <FaRobot />
-              <span>AI Parser</span>
+              <span>
+                AI Parser
+              </span>
             </NavLink>
           </li>
 
           <li>
             <NavLink
               to="/dynamic-forms"
-              className={({ isActive }) =>
+              className={({
+                isActive,
+              }) =>
                 isActive
                   ? "submission-link active"
                   : "submission-link"
               }
             >
               <FaFileAlt />
-              <span>Dynamic Forms</span>
+              <span>
+                Dynamic Forms
+              </span>
             </NavLink>
           </li>
 
           <li>
             <NavLink
               to="/analytics"
-              className={({ isActive }) =>
+              className={({
+                isActive,
+              }) =>
                 isActive
                   ? "submission-link active"
                   : "submission-link"
               }
             >
               <FaChartLine />
-              <span>Analytics</span>
+              <span>
+                Analytics
+              </span>
             </NavLink>
           </li>
 
           <li>
             <NavLink
               to="/submissions"
-              className={({ isActive }) =>
+              className={({
+                isActive,
+              }) =>
                 isActive
                   ? "submission-link active"
                   : "submission-link"
               }
             >
               <FaFileAlt />
-              <span>Submissions</span>
+              <span>
+                Submissions
+              </span>
             </NavLink>
           </li>
 
@@ -556,10 +947,14 @@ const Submissions = () => {
             <a
               href="#"
               className="submission-link"
-              onClick={(e) => e.preventDefault()}
+              onClick={(e) =>
+                e.preventDefault()
+              }
             >
               <FaUserCircle />
-              <span>Profile</span>
+              <span>
+                Profile
+              </span>
             </a>
           </li>
 
@@ -567,10 +962,15 @@ const Submissions = () => {
             <a
               href="#"
               className="submission-link"
-              onClick={(e) => e.preventDefault()}
+              onClick={(e) =>
+                e.preventDefault()
+              }
             >
               <FaBell />
-              <span>Notifications</span>
+              <span>
+                Notifications
+              </span>
+
               <small className="notification-count">
                 3
               </small>
@@ -586,8 +986,13 @@ const Submissions = () => {
           </div>
 
           <div>
-            <strong>AI Engine</strong>
-            <span>Operational</span>
+            <strong>
+              AI Engine
+            </strong>
+
+            <span>
+              Operational
+            </span>
           </div>
 
           <div className="online-dot"></div>
@@ -614,11 +1019,14 @@ const Submissions = () => {
               Submissions
             </div>
 
-            <h1>Submissions</h1>
+            <h1>
+              Submissions
+            </h1>
 
             <p>
-              Manage, review and track all insurance
-              form submissions.
+              Manage, review and track
+              all insurance form
+              submissions.
             </p>
 
           </div>
@@ -634,7 +1042,9 @@ const Submissions = () => {
                 placeholder="Search submissions..."
                 value={search}
                 onChange={(e) =>
-                  setSearch(e.target.value)
+                  setSearch(
+                    e.target.value
+                  )
                 }
               />
 
@@ -650,8 +1060,13 @@ const Submissions = () => {
               <FaUserCircle />
 
               <div>
-                <span>Welcome</span>
-                <strong>User</strong>
+                <span>
+                  Welcome
+                </span>
+
+                <strong>
+                  User
+                </strong>
               </div>
 
             </div>
@@ -673,10 +1088,14 @@ const Submissions = () => {
             </div>
 
             <div>
-              <span>Total Submissions</span>
+              <span>
+                Total Submissions
+              </span>
 
               <h2>
-                {loading ? "..." : totalSubmissions}
+                {loading
+                  ? "..."
+                  : totalSubmissions}
               </h2>
 
               <small>
@@ -694,18 +1113,20 @@ const Submissions = () => {
             </div>
 
             <div>
-
-              <span>Approved</span>
+              <span>
+                Approved
+              </span>
 
               <h2>
-                {loading ? "..." : approvedCount}
+                {loading
+                  ? "..."
+                  : approvedCount}
               </h2>
 
               <small>
                 <FaArrowRight />
                 Approved claims
               </small>
-
             </div>
 
           </div>
@@ -717,18 +1138,20 @@ const Submissions = () => {
             </div>
 
             <div>
-
-              <span>Pending Review</span>
+              <span>
+                Pending Review
+              </span>
 
               <h2>
-                {loading ? "..." : pendingCount}
+                {loading
+                  ? "..."
+                  : pendingCount}
               </h2>
 
               <small>
                 <FaArrowRight />
                 Awaiting review
               </small>
-
             </div>
 
           </div>
@@ -740,18 +1163,20 @@ const Submissions = () => {
             </div>
 
             <div>
-
-              <span>Rejected</span>
+              <span>
+                Rejected
+              </span>
 
               <h2>
-                {loading ? "..." : rejectedCount}
+                {loading
+                  ? "..."
+                  : rejectedCount}
               </h2>
 
               <small>
                 <FaArrowRight />
                 Rejected claims
               </small>
-
             </div>
 
           </div>
@@ -759,7 +1184,7 @@ const Submissions = () => {
         </section>
 
         {/* ====================================
-            TABLE CARD
+            SUBMISSIONS CARD
         ==================================== */}
 
         <section className="submissions-card">
@@ -767,59 +1192,33 @@ const Submissions = () => {
           <div className="submissions-card-header">
 
             <div>
-
-              <h2>Recent Submissions</h2>
+              <h2>
+                Recent Submissions
+              </h2>
 
               <p>
-                Real insurance claims retrieved
-                from the Forma AI backend.
+                Real insurance claims
+                retrieved from the
+                Forma AI backend.
               </p>
-
             </div>
+
+            {/* Refresh */}
 
             <button
               className="export-button"
-              onClick={() => {
-                const content = JSON.stringify(
-                  filteredSubmissions.map(
-                    (item) => item.rawClaim
-                  ),
-                  null,
-                  2
-                );
-
-                const blob = new Blob(
-                  [content],
-                  {
-                    type: "application/json",
-                  }
-                );
-
-                const url =
-                  URL.createObjectURL(blob);
-
-                const link =
-                  document.createElement("a");
-
-                link.href = url;
-
-                link.download =
-                  "forma-ai-submissions.json";
-
-                link.click();
-
-                URL.revokeObjectURL(url);
-              }}
+              onClick={
+                loadSubmissions
+              }
+              disabled={loading}
             >
-              <FaDownload />
-              Export
+              <FaArrowRight />
+              Refresh
             </button>
 
           </div>
 
-          {/* ====================================
-              ERROR
-          ==================================== */}
+          {/* ERROR */}
 
           {error && (
 
@@ -827,24 +1226,27 @@ const Submissions = () => {
 
               <FaTimesCircle />
 
-              <h3>Unable to load submissions</h3>
+              <h3>
+                Unable to load submissions
+              </h3>
 
-              <p>{error}</p>
+              <p>
+                {error}
+              </p>
 
               <button
                 className="view-button"
-                onClick={loadSubmissions}
+                onClick={
+                  loadSubmissions
+                }
               >
                 Try Again
               </button>
 
             </div>
-
           )}
 
-          {/* ====================================
-              FILTER BAR
-          ==================================== */}
+          {/* FILTER BAR */}
 
           {!error && (
 
@@ -856,9 +1258,13 @@ const Submissions = () => {
               </div>
 
               <select
-                value={statusFilter}
+                value={
+                  statusFilter
+                }
                 onChange={(e) =>
-                  setStatusFilter(e.target.value)
+                  setStatusFilter(
+                    e.target.value
+                  )
                 }
               >
 
@@ -889,9 +1295,13 @@ const Submissions = () => {
               </select>
 
               <select
-                value={typeFilter}
+                value={
+                  typeFilter
+                }
                 onChange={(e) =>
-                  setTypeFilter(e.target.value)
+                  setTypeFilter(
+                    e.target.value
+                  )
                 }
               >
 
@@ -922,43 +1332,42 @@ const Submissions = () => {
               </select>
 
               <div className="results-count">
-                {filteredSubmissions.length} results
+                {
+                  filteredSubmissions.length
+                }{" "}
+                results
               </div>
 
             </div>
-
           )}
 
-          {/* ====================================
-              LOADING
-          ==================================== */}
+          {/* LOADING */}
 
-          {loading && !error && (
+          {loading &&
+            !error && (
 
-            <div className="empty-state">
+              <div className="empty-state">
 
-              <FaSpinner className="fa-spin" />
+                <FaSpinner className="fa-spin" />
 
-              <h3>
-                Loading submissions...
-              </h3>
+                <h3>
+                  Loading submissions...
+                </h3>
 
-              <p>
-                Fetching claims from the Forma AI
-                backend.
-              </p>
+                <p>
+                  Fetching claims from
+                  the Forma AI backend.
+                </p>
 
-            </div>
+              </div>
+            )}
 
-          )}
-
-          {/* ====================================
-              TABLE
-          ==================================== */}
+          {/* TABLE */}
 
           {!loading &&
             !error &&
-            filteredSubmissions.length > 0 && (
+            filteredSubmissions.length >
+              0 && (
 
               <div className="table-wrapper">
 
@@ -968,19 +1377,33 @@ const Submissions = () => {
 
                     <tr>
 
-                      <th>Submission</th>
+                      <th>
+                        Submission
+                      </th>
 
-                      <th>Customer</th>
+                      <th>
+                        Customer
+                      </th>
 
-                      <th>Type</th>
+                      <th>
+                        Type
+                      </th>
 
-                      <th>Status</th>
+                      <th>
+                        Status
+                      </th>
 
-                      <th>AI Confidence</th>
+                      <th>
+                        AI Confidence
+                      </th>
 
-                      <th>Date</th>
+                      <th>
+                        Date
+                      </th>
 
-                      <th>Action</th>
+                      <th>
+                        Action
+                      </th>
 
                     </tr>
 
@@ -992,7 +1415,9 @@ const Submissions = () => {
                       (submission) => (
 
                         <tr
-                          key={submission.databaseId}
+                          key={
+                            submission.databaseId
+                          }
                         >
 
                           {/* Submission */}
@@ -1012,11 +1437,15 @@ const Submissions = () => {
                               <div>
 
                                 <strong>
-                                  {submission.form}
+                                  {
+                                    submission.form
+                                  }
                                 </strong>
 
                                 <span>
-                                  {submission.id}
+                                  {
+                                    submission.id
+                                  }
                                 </span>
 
                               </div>
@@ -1030,7 +1459,9 @@ const Submissions = () => {
                           <td>
 
                             <span className="customer-name">
-                              {submission.customer}
+                              {
+                                submission.customer
+                              }
                             </span>
 
                           </td>
@@ -1040,7 +1471,9 @@ const Submissions = () => {
                           <td>
 
                             <span className="type-badge">
-                              {submission.type}
+                              {
+                                submission.type
+                              }
                             </span>
 
                           </td>
@@ -1052,7 +1485,10 @@ const Submissions = () => {
                             <span
                               className={`status-badge ${submission.status
                                 .toLowerCase()
-                                .replace(/\s+/g, "-")}`}
+                                .replace(
+                                  /\s+/g,
+                                  "-"
+                                )}`}
                             >
 
                               {submission.status ===
@@ -1074,13 +1510,15 @@ const Submissions = () => {
                                 <FaClock />
                               )}
 
-                              {submission.status}
+                              {
+                                submission.status
+                              }
 
                             </span>
 
                           </td>
 
-                          {/* AI Confidence */}
+                          {/* Confidence */}
 
                           <td>
 
@@ -1096,7 +1534,7 @@ const Submissions = () => {
                                     style={{
                                       width: `${submission.confidence}%`,
                                     }}
-                                  ></div>
+                                  />
 
                                 </div>
 
@@ -1126,11 +1564,15 @@ const Submissions = () => {
                             <div className="date-cell">
 
                               <strong>
-                                {submission.date}
+                                {
+                                  submission.date
+                                }
                               </strong>
 
                               <span>
-                                {submission.time}
+                                {
+                                  submission.time
+                                }
                               </span>
 
                             </div>
@@ -1156,7 +1598,6 @@ const Submissions = () => {
                           </td>
 
                         </tr>
-
                       )
                     )}
 
@@ -1165,16 +1606,14 @@ const Submissions = () => {
                 </table>
 
               </div>
-
             )}
 
-          {/* ====================================
-              EMPTY SEARCH RESULT
-          ==================================== */}
+          {/* FILTER EMPTY */}
 
           {!loading &&
             !error &&
-            filteredSubmissions.length === 0 &&
+            filteredSubmissions.length ===
+              0 &&
             submissions.length > 0 && (
 
               <div className="empty-state">
@@ -1186,21 +1625,19 @@ const Submissions = () => {
                 </h3>
 
                 <p>
-                  Try changing your search or
-                  filters.
+                  Try changing your search
+                  or filters.
                 </p>
 
               </div>
-
             )}
 
-          {/* ====================================
-              NO DATABASE RECORDS
-          ==================================== */}
+          {/* NO RECORDS */}
 
           {!loading &&
             !error &&
-            submissions.length === 0 && (
+            submissions.length ===
+              0 && (
 
               <div className="empty-state">
 
@@ -1211,17 +1648,14 @@ const Submissions = () => {
                 </h3>
 
                 <p>
-                  Claims saved from Dynamic Forms
-                  will appear here.
+                  Claims saved from Dynamic
+                  Forms will appear here.
                 </p>
 
               </div>
-
             )}
 
-          {/* ====================================
-              PAGINATION INFO
-          ==================================== */}
+          {/* PAGINATION INFO */}
 
           {!loading &&
             !error &&
@@ -1231,8 +1665,14 @@ const Submissions = () => {
 
                 <span>
                   Showing{" "}
-                  {filteredSubmissions.length} of{" "}
-                  {submissions.length} submissions
+                  {
+                    filteredSubmissions.length
+                  }{" "}
+                  of{" "}
+                  {
+                    submissions.length
+                  }{" "}
+                  submissions
                 </span>
 
                 <div className="pagination-buttons">
@@ -1252,7 +1692,6 @@ const Submissions = () => {
                 </div>
 
               </div>
-
             )}
 
         </section>
@@ -1260,15 +1699,15 @@ const Submissions = () => {
       </main>
 
       {/* ======================================
-          VIEW MODAL
+          VIEW SUBMISSION MODAL
       ====================================== */}
 
       {selectedSubmission && (
 
         <div
           className="modal-overlay"
-          onClick={() =>
-            setSelectedSubmission(null)
+          onClick={
+            handleCloseModal
           }
         >
 
@@ -1279,16 +1718,18 @@ const Submissions = () => {
             }
           >
 
+            {/* CLOSE */}
+
             <button
               className="modal-close"
-              onClick={() =>
-                setSelectedSubmission(null)
+              onClick={
+                handleCloseModal
               }
             >
               <FaTimes />
             </button>
 
-            {/* Modal Header */}
+            {/* MODAL HEADER */}
 
             <div className="modal-top">
 
@@ -1305,41 +1746,48 @@ const Submissions = () => {
                 </span>
 
                 <h2>
-                  {selectedSubmission.id}
+                  {
+                    selectedSubmission.id
+                  }
                 </h2>
 
               </div>
 
             </div>
 
-            {/* Modal Status */}
+            {/* STATUS */}
 
             <div className="modal-status">
 
               <span
                 className={`status-badge ${selectedSubmission.status
                   .toLowerCase()
-                  .replace(/\s+/g, "-")}`}
+                  .replace(
+                    /\s+/g,
+                    "-"
+                  )}`}
               >
-                {selectedSubmission.status}
+                {
+                  selectedSubmission.status
+                }
               </span>
 
               <span className="modal-confidence">
-
                 AI Confidence:{" "}
 
                 <strong>
-                  {selectedSubmission.confidence !==
-                  null
-                    ? `${selectedSubmission.confidence}%`
-                    : "Not analyzed"}
+                  {
+                    selectedSubmission.confidence !==
+                    null
+                      ? `${selectedSubmission.confidence}%`
+                      : "Not analyzed"
+                  }
                 </strong>
-
               </span>
 
             </div>
 
-            {/* Modal Details */}
+            {/* DETAILS */}
 
             <div className="modal-details">
 
@@ -1350,7 +1798,9 @@ const Submissions = () => {
                 </span>
 
                 <strong>
-                  {selectedSubmission.form}
+                  {
+                    selectedSubmission.form
+                  }
                 </strong>
 
               </div>
@@ -1362,7 +1812,9 @@ const Submissions = () => {
                 </span>
 
                 <strong>
-                  {selectedSubmission.customer}
+                  {
+                    selectedSubmission.customer
+                  }
                 </strong>
 
               </div>
@@ -1374,7 +1826,9 @@ const Submissions = () => {
                 </span>
 
                 <strong>
-                  {selectedSubmission.type}
+                  {
+                    selectedSubmission.type
+                  }
                 </strong>
 
               </div>
@@ -1386,42 +1840,20 @@ const Submissions = () => {
                 </span>
 
                 <strong>
-                  {selectedSubmission.date}
+                  {
+                    selectedSubmission.date
+                  }
                   {" • "}
-                  {selectedSubmission.time}
+                  {
+                    selectedSubmission.time
+                  }
                 </strong>
 
               </div>
 
             </div>
 
-            {/* Error */}
-
-            {selectedSubmission.detailsError && (
-
-              <div className="modal-ai-box">
-
-                <FaTimesCircle />
-
-                <div>
-
-                  <strong>
-                    Unable to load details
-                  </strong>
-
-                  <p>
-                    {
-                      selectedSubmission.detailsError
-                    }
-                  </p>
-
-                </div>
-
-              </div>
-
-            )}
-
-            {/* Loading */}
+            {/* LOADING DETAILS */}
 
             {selectedSubmission.loadingDetails && (
 
@@ -1432,24 +1864,131 @@ const Submissions = () => {
                 <div>
 
                   <strong>
-                    Loading Claim Details
+                    Loading Claim
                   </strong>
 
                   <p>
-                    Retrieving complete claim
-                    information from MongoDB.
+                    Retrieving the complete
+                    claim from MongoDB.
                   </p>
 
                 </div>
 
               </div>
-
             )}
 
-            {/* AI Information */}
+            {/* PDF ERROR */}
+
+            {selectedSubmission.pdfError && (
+
+              <div className="modal-ai-box">
+
+                <FaTimesCircle />
+
+                <div>
+
+                  <strong>
+                    PDF Error
+                  </strong>
+
+                  <p>
+                    {
+                      selectedSubmission.pdfError
+                    }
+                  </p>
+
+                </div>
+
+              </div>
+            )}
+
+            {/* PDF GENERATING */}
+
+            {generatingPdf &&
+              !selectedSubmission.loadingDetails && (
+
+                <div className="modal-ai-box">
+
+                  <FaSpinner className="fa-spin" />
+
+                  <div>
+
+                    <strong>
+                      Generating Claim PDF
+                    </strong>
+
+                    <p>
+                      Creating the PDF from
+                      the stored claim data.
+                    </p>
+
+                  </div>
+
+                </div>
+              )}
+
+            {/* PDF PREVIEW */}
 
             {!selectedSubmission.loadingDetails &&
-              !selectedSubmission.detailsError && (
+              !generatingPdf &&
+              pdfUrl && (
+
+                <div className="submissionPdfPreview">
+
+                  <div className="submissionPdfHeader">
+
+                    <div>
+
+                      <FaFilePdf />
+
+                      <div>
+
+                        <strong>
+                          Claim PDF
+                        </strong>
+
+                        <span>
+                          {
+                            pdfFileName
+                          }
+                        </span>
+
+                      </div>
+
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={
+                        handleOpenPDF
+                      }
+                    >
+                      <FaEye />
+                      Open
+                    </button>
+
+                  </div>
+
+                  <div className="submissionPdfViewer">
+
+                    <iframe
+                      src={
+                        pdfUrl
+                      }
+                      title="Forma AI Claim PDF"
+                    />
+
+                  </div>
+
+                </div>
+              )}
+
+            {/* AI RECORD */}
+
+            {!selectedSubmission.loadingDetails &&
+              !generatingPdf &&
+              !pdfUrl &&
+              !selectedSubmission.pdfError && (
 
                 <div className="modal-ai-box">
 
@@ -1462,41 +2001,48 @@ const Submissions = () => {
                     </strong>
 
                     <p>
-                      This submission was retrieved
-                      directly from the Forma AI backend
-                      and stored claim database.
+                      This submission was
+                      retrieved directly
+                      from the Forma AI
+                      backend.
                     </p>
 
                   </div>
 
                 </div>
-
               )}
 
-            {/* Modal Actions */}
+            {/* MODAL ACTIONS */}
 
             <div className="modal-actions">
 
               <button
                 className="secondary-modal-button"
-                onClick={() =>
-                  handleDownload(
-                    selectedSubmission
-                  )
+                onClick={
+                  handleDownloadPDF
+                }
+                disabled={
+                  generatingPdf
                 }
               >
                 <FaDownload />
-                Download
+                {generatingPdf
+                  ? "Generating..."
+                  : "Download PDF"}
               </button>
 
               <button
                 className="primary-modal-button"
-                onClick={() =>
-                  setSelectedSubmission(null)
+                onClick={
+                  handleOpenPDF
+                }
+                disabled={
+                  !pdfUrl ||
+                  generatingPdf
                 }
               >
-                Close
-                <FaTimes />
+                <FaFilePdf />
+                Open PDF
               </button>
 
             </div>
@@ -1504,17 +2050,10 @@ const Submissions = () => {
           </div>
 
         </div>
-
       )}
 
     </div>
   );
 };
 
-// ==========================================
-// Export
-// ==========================================
-
 export default Submissions;
-
-
