@@ -1,7 +1,13 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "./AIParser.css";
-import { aiApi } from "../api";
+
+import {
+  aiApi,
+  createClaim,
+  submitClaim as submitClaimAPI,
+  uploadClaimDocuments,
+} from "../services/api";
 
 import {
   FaRobot,
@@ -12,683 +18,900 @@ import {
   FaMagic,
   FaCheckCircle,
   FaBrain,
-  FaPaperPlane,
   FaTrash,
-  FaFileAlt,
   FaShieldAlt,
   FaArrowRight,
   FaExclamationCircle,
   FaStop,
+  FaExternalLinkAlt,
+  FaDownload,
+  FaEdit,
+  FaLightbulb,
+  FaFileAlt,
+  FaChartLine,
+  FaInfoCircle,
 } from "react-icons/fa";
 
-const defaultSampleFields = [
-  { label: "Insurance Type", value: "Vehicle Accident Claim" },
-  { label: "Applicant", value: "Chandra Mahesh Goud" },
-  { label: "Policy Number", value: "POL-2026-987654" },
-  { label: "Incident Date", value: "04 September 2026" },
-  { label: "Location", value: "Hyderabad ORR Exit 14" },
-  { label: "Claim Amount", value: "₹48,500" },
+const SAMPLE_PROMPTS = [
+  "My Honda City was rear-ended at a red light on I-95 on May 12. The rear bumper and trunk are severely damaged.",
+  "Water pipe burst in the upstairs bathroom, causing ceiling leakage in the living room and damaging wooden furniture.",
+  "Lost my luggage during a layover at JFK airport on flight AC102. Contains laptop and personal electronics.",
 ];
 
 const AIParser = () => {
   const navigate = useNavigate();
-  const promptRef = useRef(null);
 
-  const [prompt, setPrompt] = useState("");
-  const [images, setImages] = useState([]);
-  const [pdfs, setPdfs] = useState([]);
+  // ===================================================
+  // STATE
+  // ===================================================
+  const [description, setDescription] = useState("");
+  const [category, setCategory] = useState("");
+  const [extractedData, setExtractedData] = useState(null);
+  const [summary, setSummary] = useState("");
+  const [confidence, setConfidence] = useState(0);
   const [loading, setLoading] = useState(false);
-  const [isListening, setIsListening] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
+  const [claimId, setClaimId] = useState("");
+  const [claimNumber, setClaimNumber] = useState("");
+  const [pdfUrl, setPdfUrl] = useState("");
+  const [fileName, setFileName] = useState("");
+  const [editingField, setEditingField] = useState(null);
 
-  const [extractedData, setExtractedData] = useState(null);
-  const [summaryText, setSummaryText] = useState("");
-  const [confidenceScore, setConfidenceScore] = useState(97);
+  // ===================================================
+  // IMAGE / PDF FILES
+  // ===================================================
+  const [images, setImages] = useState([]);
+  const [pdfs, setPdfs] = useState([]);
+  const imageInputRef = useRef(null);
+  const pdfInputRef = useRef(null);
+  const imagesRef = useRef(images);
 
+  useEffect(() => {
+    imagesRef.current = images;
+  }, [images]);
+
+  // ===================================================
+  // VOICE
+  // ===================================================
+  const [isListening, setIsListening] = useState(false);
   const recognitionRef = useRef(null);
 
   useEffect(() => {
-    const SpeechRecognition =
-      window.SpeechRecognition || window.webkitSpeechRecognition;
-
-    if (SpeechRecognition) {
-      try {
-        const recognition = new SpeechRecognition();
-        recognition.continuous = true;
-        recognition.interimResults = true;
-        recognition.lang = "en-US";
-
-        recognition.onstart = () => {
-          setIsListening(true);
-          setError("");
-          setSuccessMessage("Listening... Speak your insurance claim details.");
-        };
-
-        recognition.onresult = (event) => {
-          let transcript = "";
-          for (let i = 0; i < event.results.length; i++) {
-            transcript += event.results[i][0].transcript;
-          }
-          if (transcript.trim()) {
-            setPrompt(transcript);
-          }
-        };
-
-        recognition.onerror = (event) => {
-          console.error("Speech Recognition Error:", event.error);
-          setIsListening(false);
-          if (event.error === "not-allowed" || event.error === "permission-denied") {
-            setError(
-              "Microphone permission denied. Please allow microphone access in your browser settings to use voice input."
-            );
-          } else if (event.error === "no-speech") {
-            setError("No speech was detected. Please speak clearly into your microphone.");
-          } else if (event.error === "network") {
-            setError("Network error occurred during speech recognition. Please check your internet connection.");
-          } else {
-            setError(`Speech recognition notice: ${event.error}. You can also type your claim description.`);
-          }
-        };
-
-        recognition.onend = () => {
-          setIsListening(false);
-        };
-
-        recognitionRef.current = recognition;
-      } catch (err) {
-        console.error("Speech Recognition init error:", err);
-      }
-    }
-
     return () => {
       if (recognitionRef.current) {
         try {
           recognitionRef.current.stop();
-        } catch (_) {}
+        } catch (error) {
+          console.log("Voice cleanup:", error);
+        }
       }
+
+      imagesRef.current.forEach((image) => {
+        if (image.preview) {
+          URL.revokeObjectURL(image.preview);
+        }
+      });
     };
   }, []);
 
-  const toggleVoiceInput = () => {
-    setError("");
-    setSuccessMessage("");
+  // ===================================================
+  // IMAGE & PDF HANDLERS
+  // ===================================================
+  const handleImageUpload = (event) => {
+    const selectedFiles = Array.from(event.target.files || []);
+    if (selectedFiles.length === 0) return;
 
+    const validImages = selectedFiles.filter((file) =>
+      file.type.startsWith("image/")
+    );
+
+    const imageObjects = validImages.map((file) => ({
+      file,
+      preview: URL.createObjectURL(file),
+      id: Date.now() + Math.random(),
+    }));
+
+    setImages((prev) => [...prev, ...imageObjects]);
+    setError("");
+    event.target.value = "";
+  };
+
+  const handlePdfUpload = (event) => {
+    const selectedFiles = Array.from(event.target.files || []);
+    if (selectedFiles.length === 0) return;
+
+    const validPDFs = selectedFiles.filter(
+      (file) =>
+        file.type === "application/pdf" ||
+        file.name.toLowerCase().endsWith(".pdf")
+    );
+
+    const pdfObjects = validPDFs.map((file) => ({
+      file,
+      id: Date.now() + Math.random(),
+    }));
+
+    setPdfs((prev) => [...prev, ...pdfObjects]);
+    setError("");
+    event.target.value = "";
+  };
+
+  const removeImage = (id) => {
+    setImages((prev) => {
+      const image = prev.find((item) => item.id === id);
+      if (image?.preview) URL.revokeObjectURL(image.preview);
+      return prev.filter((item) => item.id !== id);
+    });
+  };
+
+  const removePdf = (id) => {
+    setPdfs((prev) => prev.filter((item) => item.id !== id));
+  };
+
+  // ===================================================
+  // VOICE CONTROL
+  // ===================================================
+  const startVoiceRecognition = () => {
     const SpeechRecognition =
       window.SpeechRecognition || window.webkitSpeechRecognition;
 
     if (!SpeechRecognition) {
-      setError(
-        "Browser Speech Recognition is not supported in this browser. Please use Chrome, Edge, or Safari, or type your claim description."
-      );
+      setError("Voice recognition is not supported in this browser.");
       return;
     }
 
-    if (isListening) {
-      if (recognitionRef.current) {
-        try {
-          recognitionRef.current.stop();
-        } catch (_) {}
-      }
+    const recognition = new SpeechRecognition();
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.lang = "en-US";
+
+    recognition.onstart = () => {
+      setIsListening(true);
+      setError("");
+    };
+
+    recognition.onresult = (event) => {
+      const transcript = event.results[0][0].transcript;
+      setDescription((prev) => (prev ? `${prev} ${transcript}` : transcript));
+    };
+
+    recognition.onerror = (event) => {
+      console.error("Voice recognition error:", event.error);
+      setError("Unable to capture voice input.");
       setIsListening(false);
-      setSuccessMessage("Voice recording stopped. You can now parse with AI.");
-    } else {
-      try {
-        if (recognitionRef.current) {
-          recognitionRef.current.start();
-        }
-      } catch (err) {
-        console.error("Speech start error:", err);
-        setError("Unable to access microphone. Please check permissions.");
-      }
-    }
+    };
+
+    recognition.onend = () => setIsListening(false);
+
+    recognitionRef.current = recognition;
+    recognition.start();
   };
 
-  const handleImageUpload = (e) => {
-    const files = Array.from(e.target.files || []);
-    setImages((prev) => [...prev, ...files]);
-  };
-
-  const handlePdfUpload = (e) => {
-    const files = Array.from(e.target.files || []);
-    setPdfs((prev) => [...prev, ...files]);
-  };
-
-  const parseAI = async () => {
-    if (!prompt || !prompt.trim()) {
-      setError("Please describe your insurance claim or use voice input before parsing.");
-      return;
-    }
-
-    if (isListening && recognitionRef.current) {
+  const stopVoiceRecognition = () => {
+    if (recognitionRef.current) {
       try {
         recognitionRef.current.stop();
-      } catch (_) {}
-      setIsListening(false);
+      } catch (error) {
+        console.log("Voice stop:", error);
+      }
     }
+    setIsListening(false);
+  };
 
-    setLoading(true);
+  // ===================================================
+  // AI PARSING & DATA EDITING
+  // ===================================================
+  const parseAI = async () => {
     setError("");
     setSuccessMessage("");
 
-    try {
-      const response = await aiApi.prefillForm(prompt.trim());
-      const data = response?.extractedData || response?.data || response;
+    if (!description.trim()) {
+      setError("Please describe the incident before analyzing.");
+      return;
+    }
 
-      setExtractedData(data);
-      if (data?.summary) {
-        setSummaryText(data.summary);
+    try {
+      setLoading(true);
+      setExtractedData(null);
+      setCategory("");
+      setSummary("");
+      setConfidence(0);
+      setSubmitted(false);
+      setClaimId("");
+      setClaimNumber("");
+      setPdfUrl("");
+      setFileName("");
+
+      const result = await aiApi.prefillForm(description.trim());
+
+      if (!result?.success) {
+        throw new Error(result?.message || "AI failed to analyze the incident.");
       }
-      setConfidenceScore(97);
-      setSuccessMessage("AI successfully extracted claim fields from your description!");
+
+      setCategory(result.category || "");
+      setExtractedData(result.extractedData || result.claimData || {});
+      setSummary(result.summary || "");
+      setConfidence(Number(result.confidence || 0));
+
+      if (result.claimNumber) setClaimNumber(result.claimNumber);
+      if (result.pdfUrl) setPdfUrl(result.pdfUrl);
+      if (result.fileName) setFileName(result.fileName);
+
+      setSuccessMessage("AI successfully analyzed your incident.");
     } catch (err) {
-      console.error("AI Parse Error:", err);
-      const backendMsg =
+      const message =
         err.response?.data?.message ||
+        err.response?.data?.error ||
         err.message ||
-        "Failed to extract claim information. Please check your backend connection.";
-      setError(backendMsg);
+        "Unable to analyze the incident.";
+      setError(message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleFieldValueChange = (key, newValue) => {
+    setExtractedData((prev) => ({
+      ...prev,
+      [key]: newValue,
+    }));
+  };
+
+  // ===================================================
+  // SUBMISSION
+  // ===================================================
+  const handleSubmitClaim = async () => {
+    setError("");
+    setSuccessMessage("");
+
+    if (!extractedData) {
+      setError("Please analyze the incident before submitting.");
+      return;
+    }
+
+    if (!category) {
+      setError("Insurance category was not detected.");
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      const createResponse = await createClaim(extractedData, category);
+      const createdClaim =
+        createResponse?.claim || createResponse?.data || createResponse;
+
+      const newClaimId =
+        createdClaim?._id ||
+        createdClaim?.id ||
+        createResponse?.claimId ||
+        createResponse?.data?._id ||
+        createResponse?.data?.id;
+
+      const newClaimNumber =
+        createdClaim?.claimNumber ||
+        createResponse?.claimNumber ||
+        createResponse?.data?.claimNumber ||
+        "";
+
+      if (!newClaimId) {
+        throw new Error("Claim was created but no ID was returned.");
+      }
+
+      setClaimId(newClaimId);
+      if (newClaimNumber) setClaimNumber(newClaimNumber);
+
+      const imageFiles = images.map((item) => item.file);
+      const pdfFiles = pdfs.map((item) => item.file);
+      const allDocuments = [...imageFiles, ...pdfFiles];
+
+      if (allDocuments.length > 0) {
+        try {
+          await uploadClaimDocuments(newClaimId, allDocuments);
+        } catch (uploadError) {
+          throw new Error("Claim was created, but document upload failed.");
+        }
+      }
+
+      const submitResponse = await submitClaimAPI(newClaimId);
+      const submittedClaim =
+        submitResponse?.claim || submitResponse?.data || submitResponse;
+
+      const returnedPdfUrl =
+        submittedClaim?.pdfUrl ||
+        submitResponse?.pdfUrl ||
+        submitResponse?.data?.pdfUrl;
+
+      const returnedFileName =
+        submittedClaim?.fileName ||
+        submitResponse?.fileName ||
+        submitResponse?.data?.fileName;
+
+      if (returnedPdfUrl) setPdfUrl(returnedPdfUrl);
+      if (returnedFileName) setFileName(returnedFileName);
+
+      setSubmitted(true);
+      setSuccessMessage(`Claim ${newClaimNumber || newClaimId} submitted successfully.`);
+    } catch (err) {
+      const message =
+        err.response?.data?.message ||
+        err.response?.data?.error ||
+        err.message ||
+        "Unable to submit claim.";
+      setError(message);
     } finally {
       setLoading(false);
     }
   };
 
   const handleClear = () => {
-    setPrompt("");
-    setImages([]);
-    setPdfs([]);
+    images.forEach((image) => {
+      if (image.preview) URL.revokeObjectURL(image.preview);
+    });
+
+    setDescription("");
+    setCategory("");
     setExtractedData(null);
-    setSummaryText("");
+    setSummary("");
+    setConfidence(0);
+    setLoading(false);
+    setSubmitted(false);
     setError("");
     setSuccessMessage("");
-    if (isListening && recognitionRef.current) {
-      try {
-        recognitionRef.current.stop();
-      } catch (_) {}
-      setIsListening(false);
-    }
+    setClaimId("");
+    setClaimNumber("");
+    setPdfUrl("");
+    setFileName("");
+    setImages([]);
+    setPdfs([]);
   };
 
-  const scrollToPrompt = () => {
-    if (promptRef.current) {
-      promptRef.current.scrollIntoView({ behavior: "smooth" });
-      promptRef.current.focus();
-    }
+  const getFullPdfUrl = () => {
+    if (!pdfUrl) return "";
+    if (pdfUrl.startsWith("http://") || pdfUrl.startsWith("https://")) return pdfUrl;
+    return `http://localhost:5000${pdfUrl}`;
   };
 
-  // Compute active fields to display
-  const activeFields = extractedData
-    ? [
-        {
-          label: "Incident Type",
-          value: extractedData.incidentType || "Incident Detected",
-        },
-        {
-          label: "Vehicle / Asset",
-          value: extractedData.vehicle || "Vehicle Involved",
-        },
-        {
-          label: "Damage Detected",
-          value: Array.isArray(extractedData.damage)
-            ? extractedData.damage.join(", ") || "Damage Reported"
-            : extractedData.damage || "Damage Reported",
-        },
-        {
-          label: "Location",
-          value: extractedData.location || "Location Not Specified",
-        },
-        {
-          label: "Incident Date",
-          value: extractedData.incidentDate || "Recent Incident",
-        },
-        {
-          label: "Claim Summary",
-          value: extractedData.summary || "Structured from description",
-        },
-      ]
-    : defaultSampleFields;
+  const openPDF = () => {
+    const url = getFullPdfUrl();
+    if (!url) {
+      setError("PDF is not available yet.");
+      return;
+    }
+    window.open(url, "_blank", "noopener,noreferrer");
+  };
+
+  const downloadPDF = () => {
+    const url = getFullPdfUrl();
+    if (!url) {
+      setError("PDF is not available yet.");
+      return;
+    }
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = fileName || "forma-ai-claim.pdf";
+    link.target = "_blank";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const formatFieldName = (field) => {
+    return field
+      .replace(/([A-Z])/g, " $1")
+      .replace(/^./, (str) => str.toUpperCase());
+  };
+
+  const getStepClass = (stepNum) => {
+    if (submitted) return "forma-step forma-step-completed";
+    if (stepNum === 1) return "forma-step forma-step-active";
+    if (stepNum === 2 && extractedData) return "forma-step forma-step-active";
+    if (stepNum === 2 && !extractedData) return "forma-step forma-step-completed";
+    if (stepNum === 3 && extractedData) return "forma-step forma-step-active";
+    return "forma-step";
+  };
 
   return (
-    <div className="aiParserPage">
-
-      {/* HERO */}
-      <section className="aiHero">
-        <div className="aiHeroLeft">
-          <span className="aiHeroBadge">
-            <FaRobot />
-            Forma AI • Smart AI Parser
-          </span>
-
-          <h1>AI Insurance Claim Parser</h1>
-
-          <p>
-            Upload insurance documents, accident photos, or describe your claim
-            in natural language or voice. Forma AI automatically extracts fields and
-            prepares your application.
-          </p>
-
-          <div className="heroButtons">
-            <button className="aiPrimaryBtn" onClick={scrollToPrompt}>
-              <FaMagic />
-              Start AI Parsing
-            </button>
-
-            <button
-              className="aiSecondaryBtn"
-              onClick={() => {
-                const uploadEl = document.getElementById("pdf-upload-input");
-                if (uploadEl) uploadEl.click();
-              }}
-            >
-              <FaCloudUploadAlt />
-              Upload Documents
-            </button>
-          </div>
-        </div>
-
-        <div className="aiHeroRight">
-          <div className="aiStatCard">
-            <FaRobot />
-            <div>
-              <h2>842</h2>
-              <span>AI Parsed Claims</span>
-            </div>
-          </div>
-
-          <div className="aiStatCard">
-            <FaCheckCircle />
-            <div>
-              <h2>{confidenceScore}%</h2>
-              <span>AI Accuracy</span>
-            </div>
-          </div>
-
-          <div className="aiStatCard">
-            <FaBrain />
-            <div>
-              <h2>35+</h2>
-              <span>Fields Extracted</span>
-            </div>
-          </div>
-
-          <div className="aiStatCard">
-            <FaShieldAlt />
-            <div>
-              <h2>100%</h2>
-              <span>Secure Processing</span>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* PROMPT */}
-      <section className="promptCard">
-        <div className="promptHeader">
+    <div className="forma-page-container">
+      {/* HEADER SECTION */}
+      <div className="forma-page-header">
+        <div className="forma-header-brand-icon">
           <FaRobot />
-          <h3>Describe Your Insurance Claim</h3>
         </div>
-
-        <textarea
-          ref={promptRef}
-          rows={6}
-          value={prompt}
-          onChange={(e) => {
-            setPrompt(e.target.value);
-            if (error) setError("");
-          }}
-          placeholder="Example: I hit a deer on the highway yesterday. The windshield shattered and the front bumper was damaged..."
-        />
-
-        {/* ALERTS */}
-        {error && (
-          <div className="parserAlert error">
-            <FaExclamationCircle />
-            <span>{error}</span>
+        <div className="forma-header-brand-details">
+          <div className="forma-header-tag-row">
+            <h1 className="forma-brand-title">Forma AI Assistant</h1>
+            <span className="forma-badge-v2">Engine v2.4</span>
           </div>
-        )}
-
-        {successMessage && (
-          <div className="parserAlert success">
-            <FaCheckCircle />
-            <span>{successMessage}</span>
-          </div>
-        )}
-
-        <div style={{ display: "flex", gap: "14px", flexWrap: "wrap", alignItems: "center" }}>
-          <button
-            type="button"
-            className={`voiceButton ${isListening ? "listening" : ""}`}
-            onClick={toggleVoiceInput}
-          >
-            {isListening ? (
-              <>
-                <FaStop />
-                <span>Listening... Click to Stop</span>
-              </>
-            ) : (
-              <>
-                <FaMicrophone />
-                <span>Voice Input</span>
-              </>
-            )}
-          </button>
-
-          <button
-            type="button"
-            className="parseButton"
-            onClick={parseAI}
-            disabled={loading}
-          >
-            <FaMagic />
-            {loading ? "Parsing with AI..." : "Parse with AI"}
-          </button>
-        </div>
-      </section>
-
-      {/* UPLOADS */}
-      <section className="uploadSection">
-
-        <div className="uploadCard">
-          <div className="uploadHeader">
-            <FaCamera />
-            <h3>Upload Images</h3>
-          </div>
-
-          <label className="uploadBox">
-            <FaCloudUploadAlt />
-            <h4>Upload Accident Images</h4>
-            <p>PNG, JPG, JPEG</p>
-
-            <input
-              type="file"
-              multiple
-              accept="image/*"
-              hidden
-              onChange={handleImageUpload}
-            />
-
-            <button type="button" className="uploadBtn">
-              Choose Images
-            </button>
-          </label>
-        </div>
-
-        <div className="uploadCard">
-          <div className="uploadHeader">
-            <FaFilePdf />
-            <h3>Upload PDF</h3>
-          </div>
-
-          <label className="uploadBox">
-            <FaFilePdf />
-            <h4>Upload Insurance PDF</h4>
-            <p>Policy, Medical Report, FIR, Invoice</p>
-
-            <input
-              id="pdf-upload-input"
-              type="file"
-              accept=".pdf"
-              hidden
-              onChange={handlePdfUpload}
-            />
-
-            <button type="button" className="uploadBtn">
-              Choose PDF
-            </button>
-          </label>
-        </div>
-
-      </section>
-
-      {/* IMAGE PREVIEW */}
-      {images.length > 0 && (
-        <section className="imagePreviewSection">
-          <h3>Uploaded Images ({images.length})</h3>
-
-          <div className="previewGrid">
-            {images.map((file, index) => (
-              <div key={index} className="previewCard">
-                <img src={URL.createObjectURL(file)} alt={file.name} />
-
-                <div className="previewOverlay">{file.name}</div>
-
-                <button
-                  className="removeImage"
-                  onClick={() =>
-                    setImages(images.filter((_, i) => i !== index))
-                  }
-                >
-                  <FaTrash />
-                </button>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* PDF PREVIEW */}
-      {pdfs.length > 0 && (
-        <section className="pdfSection">
-          <h3>Uploaded PDFs ({pdfs.length})</h3>
-
-          <div className="pdfList">
-            {pdfs.map((file, index) => (
-              <div key={index} className="pdfCard">
-                <div className="pdfInfo">
-                  <FaFilePdf />
-                  <div>
-                    <h4>{file.name}</h4>
-                    <span>{(file.size / 1024).toFixed(1)} KB</span>
-                  </div>
-                </div>
-
-                <button
-                  className="pdfDelete"
-                  onClick={() => setPdfs(pdfs.filter((_, i) => i !== index))}
-                >
-                  <FaTrash />
-                </button>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* LOADING */}
-      {loading && (
-        <section className="processingCard">
-          <div className="processingHeader">
-            <FaBrain />
-            <h2>AI Processing...</h2>
-          </div>
-
-          <div className="processingLoader">
-            <div className="aiSpinner"></div>
-          </div>
-
-          <div className="timeline">
-            <div className="timelineItem timelineDone">
-              <div className="timelineIcon">
-                <FaCheckCircle />
-              </div>
-
-              <div className="timelineContent">
-                <h4>Natural Language Analysis</h4>
-                <p>Reading voice transcript and incident details.</p>
-              </div>
-            </div>
-
-            <div className="timelineItem">
-              <div className="timelineIcon">
-                <FaRobot />
-              </div>
-
-              <div className="timelineContent">
-                <h4>Extracting Insurance Fields</h4>
-                <p>Identifying claim information using Gemini AI.</p>
-              </div>
-            </div>
-
-            <div className="timelineItem">
-              <div className="timelineIcon">
-                <FaBrain />
-              </div>
-
-              <div className="timelineContent">
-                <h4>Generating Structured Form</h4>
-                <p>Preparing fields for Dynamic Forms.</p>
-              </div>
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* CONFIDENCE */}
-      <section className="confidenceWrapper">
-
-        <div className="confidenceCard">
-          <div className="confidenceCircle">
-            <div className="confidenceInner">
-              <h1>{confidenceScore}%</h1>
-              <span>Confidence</span>
-            </div>
-          </div>
-
-          <p>
-            {extractedData
-              ? "Forma AI has successfully extracted structured information from your description."
-              : "Forma AI automatically extracts structured information with high confidence."}
+          <p className="forma-brand-subtitle">
+            Next-Generation Automated Claim Extraction & Structuring Engine
           </p>
         </div>
-
-        <div className="confidenceDetails">
-
-          <h3>Extraction Quality</h3>
-
-          {[
-            ["Voice / OCR Accuracy", "98%"],
-            ["Entity Detection", "99%"],
-            ["Damage Mapping", "96%"],
-            ["Claim Summary", "94%"],
-          ].map(([label, value], index) => (
-            <div className="confidenceItem" key={index}>
-              <label>
-                <span>{label}</span>
-                <strong>{value}</strong>
-              </label>
-
-              <div className="progressBar">
-                <div className="progressFill" style={{ width: value }}></div>
-              </div>
-            </div>
-          ))}
-        </div>
-
-      </section>
-
-      {/* PARSED FIELDS */}
-      <section className="ocrCard">
-
-        <div className="ocrHeader">
-          <FaFileAlt />
-          <h2>AI Extracted Form Fields</h2>
-        </div>
-
-        <div className="ocrGrid">
-          {activeFields.map((field, index) => (
-            <div className="ocrItem" key={index}>
-              <span>{field.label}</span>
-              <h4>{field.value}</h4>
-            </div>
-          ))}
-        </div>
-
-      </section>
-
-      {/* SUMMARY */}
-      <section className="summaryCard">
-
-        <div className="summaryHeader">
-          <FaRobot />
-          <h2>AI Summary</h2>
-        </div>
-
-        <div className="summaryContent">
-          <p>
-            {summaryText ||
-              "Vehicle accident claim detected. The insured vehicle sustained front bumper and windshield damage after colliding with an animal. Estimated claim value: ₹48,500. Required supporting documents include FIR, vehicle RC, driver's license, repair invoice, and accident photos."}
-          </p>
-        </div>
-
-      </section>
-
-      {/* SUGGESTIONS */}
-      <section className="aiSuggestionCard">
-
-        <h2>AI Smart Suggestions</h2>
-
-        <div className="suggestionList">
-
-          <div className="suggestionItem">
-            <FaCheckCircle />
-            <div>
-              Upload FIR copy for faster verification.
-            </div>
-          </div>
-
-          <div className="suggestionItem">
-            <FaCheckCircle />
-            <div>
-              Vehicle Registration Certificate is recommended.
-            </div>
-          </div>
-
-          <div className="suggestionItem">
-            <FaCheckCircle />
-            <div>
-              Upload multiple damage images to improve AI confidence.
-            </div>
-          </div>
-
-          <div className="suggestionItem">
-            <FaCheckCircle />
-            <div>
-              AI detected all mandatory claim fields successfully.
-            </div>
-          </div>
-
-        </div>
-
-      </section>
-
-      {/* BUTTONS */}
-      <div className="actionButtons">
-
-        <button className="clearBtn" type="button" onClick={handleClear}>
-          <FaTrash />
-          Clear
-        </button>
-
-        <button
-          className="editBtn"
-          type="button"
-          onClick={scrollToPrompt}
-        >
-          <FaFileAlt />
-          Edit Description
-        </button>
-
-        <button
-          className="generateBtn"
-          type="button"
-          onClick={() => navigate("/dynamic-forms")}
-        >
-          Continue to Dynamic Form
-          <FaArrowRight />
-        </button>
-
       </div>
 
+      {/* WORKFLOW TRACKER STEPS */}
+      <div className="forma-stepper-wrapper">
+        <div className={getStepClass(1)}>
+          <div className="forma-step-number">1</div>
+          <div className="forma-step-info">
+            <span className="forma-step-title">Describe Incident</span>
+            <span className="forma-step-desc">Text, Voice or Media</span>
+          </div>
+        </div>
+        <div className="forma-step-divider" />
+        <div className={getStepClass(2)}>
+          <div className="forma-step-number">2</div>
+          <div className="forma-step-info">
+            <span className="forma-step-title">AI Processing</span>
+            <span className="forma-step-desc">Extract Key Entities</span>
+          </div>
+        </div>
+        <div className="forma-step-divider" />
+        <div className={getStepClass(3)}>
+          <div className="forma-step-number">3</div>
+          <div className="forma-step-info">
+            <span className="forma-step-title">Submit & Generate</span>
+            <span className="forma-step-desc">Create Claim & PDF</span>
+          </div>
+        </div>
+      </div>
+
+      {/* METRICS & QUICK SUMMARY RIBBON */}
+      <div className="forma-metrics-ribbon">
+        <div className="forma-metric-card">
+          <div className="forma-metric-icon-box">
+            <FaBrain />
+          </div>
+          <div>
+            <div className="forma-metric-label">AI Status</div>
+            <div className="forma-metric-value">
+              {loading ? "Analyzing..." : extractedData ? "Processed" : "Ready"}
+            </div>
+          </div>
+        </div>
+
+        <div className="forma-metric-card">
+          <div className="forma-metric-icon-box">
+            <FaChartLine />
+          </div>
+          <div>
+            <div className="forma-metric-label">Accuracy Score</div>
+            <div className="forma-metric-value">
+              {confidence ? `${Math.round(confidence * 100)}%` : "0%"}
+            </div>
+          </div>
+        </div>
+
+        <div className="forma-metric-card">
+          <div className="forma-metric-icon-box">
+            <FaFileAlt />
+          </div>
+          <div>
+            <div className="forma-metric-label">Detected Type</div>
+            <div className="forma-metric-value">
+              {category ? category.toUpperCase() : "None"}
+            </div>
+          </div>
+        </div>
+
+        <div className="forma-metric-card">
+          <div className="forma-metric-icon-box">
+            <FaCloudUploadAlt />
+          </div>
+          <div>
+            <div className="forma-metric-label">Files Attached</div>
+            <div className="forma-metric-value">
+              {images.length + pdfs.length} Document(s)
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ERROR & SUCCESS ALERTS */}
+      {error && (
+        <div className="forma-alert-box forma-alert-error">
+          <FaExclamationCircle className="forma-alert-icon" />
+          <span>{error}</span>
+        </div>
+      )}
+
+      {successMessage && (
+        <div className="forma-alert-box forma-alert-success">
+          <FaCheckCircle className="forma-alert-icon" />
+          <span>{successMessage}</span>
+        </div>
+      )}
+
+      {/* MAIN TWO-COLUMN LAYOUT */}
+      <div className="forma-layout-grid">
+        {/* LEFT COLUMN - INPUT & UPLOAD */}
+        <div className="forma-grid-left">
+          <div className="forma-card">
+            <div className="forma-card-header">
+              <div className="forma-card-title">
+                <FaBrain className="forma-card-icon" />
+                <div>
+                  <h2 className="forma-card-heading">1. Describe Your Incident</h2>
+                  <p className="forma-card-subheading">
+                    Provide detail manually, using speech, or try a quick template.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* PRESET PROMPTS */}
+            <div className="forma-samples-container">
+              <div className="forma-samples-title">
+                <FaLightbulb /> Quick Sample Prompts:
+              </div>
+              <div className="forma-samples-pills">
+                {SAMPLE_PROMPTS.map((prompt, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    className="forma-sample-pill"
+                    onClick={() => setDescription(prompt)}
+                  >
+                    Template {idx + 1}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* TEXTAREA INPUT */}
+            <div className="forma-input-field-wrapper">
+              <textarea
+                className="forma-textarea"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Describe what happened, including dates, locations, vehicle details, damages, or affected parties..."
+                rows={7}
+                disabled={loading}
+              />
+
+              <div className="forma-textarea-footer-bar">
+                <span className="forma-char-counter">
+                  {description.length} characters typed
+                </span>
+                <button
+                  type="button"
+                  className={
+                    isListening
+                      ? "forma-voice-btn forma-voice-btn-active"
+                      : "forma-voice-btn"
+                  }
+                  onClick={
+                    isListening ? stopVoiceRecognition : startVoiceRecognition
+                  }
+                  disabled={loading}
+                >
+                  {isListening ? (
+                    <>
+                      <FaStop /> Stop Recording
+                    </>
+                  ) : (
+                    <>
+                      <FaMicrophone /> Voice Input
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {/* PARSE BUTTON */}
+            <button
+              type="button"
+              className="forma-primary-action-btn"
+              onClick={parseAI}
+              disabled={loading || !description.trim()}
+            >
+              {loading ? (
+                <>
+                  <span className="forma-loader-spinner" /> Analyzing Incident...
+                </>
+              ) : (
+                <>
+                  <FaMagic /> Extract Data with Forma AI <FaArrowRight />
+                </>
+              )}
+            </button>
+          </div>
+
+          {/* DOCUMENT ATTACHMENTS */}
+          <div className="forma-card">
+            <div className="forma-card-header">
+              <div className="forma-card-title">
+                <FaCloudUploadAlt className="forma-card-icon" />
+                <div>
+                  <h2 className="forma-card-heading">2. Attach Proof Documents</h2>
+                  <p className="forma-card-subheading">
+                    Upload photos, repair estimates, or police reports.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="forma-upload-grid">
+              <div
+                className="forma-dropzone-tile"
+                onClick={() => imageInputRef.current?.click()}
+              >
+                <FaCamera className="forma-dropzone-icon" />
+                <h3 className="forma-dropzone-title">Upload Images</h3>
+                <p className="forma-dropzone-desc">JPG, PNG, WEBP files</p>
+                <span className="forma-dropzone-badge">{images.length} added</span>
+                <input
+                  ref={imageInputRef}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  hidden
+                  onChange={handleImageUpload}
+                />
+              </div>
+
+              <div
+                className="forma-dropzone-tile"
+                onClick={() => pdfInputRef.current?.click()}
+              >
+                <FaFilePdf className="forma-dropzone-icon" />
+                <h3 className="forma-dropzone-title">Upload Documents</h3>
+                <p className="forma-dropzone-desc">PDF invoices or forms</p>
+                <span className="forma-dropzone-badge">{pdfs.length} added</span>
+                <input
+                  ref={pdfInputRef}
+                  type="file"
+                  accept=".pdf,application/pdf"
+                  multiple
+                  hidden
+                  onChange={handlePdfUpload}
+                />
+              </div>
+            </div>
+
+            {/* IMAGE PREVIEWS */}
+            {images.length > 0 && (
+              <div className="forma-attachments-section">
+                <h3 className="forma-section-label">Attached Images</h3>
+                <div className="forma-media-thumbs-grid">
+                  {images.map((image) => (
+                    <div className="forma-media-thumb-card" key={image.id}>
+                      <img
+                        src={image.preview}
+                        alt={image.file.name}
+                        className="forma-media-thumb-img"
+                      />
+                      <button
+                        type="button"
+                        className="forma-thumb-remove-btn"
+                        onClick={() => removeImage(image.id)}
+                      >
+                        <FaTrash />
+                      </button>
+                      <p className="forma-thumb-filename">{image.file.name}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* PDF PREVIEWS */}
+            {pdfs.length > 0 && (
+              <div className="forma-attachments-section">
+                <h3 className="forma-section-label">Attached PDFs</h3>
+                <div className="forma-pdf-list-container">
+                  {pdfs.map((pdf) => (
+                    <div className="forma-pdf-item-row" key={pdf.id}>
+                      <FaFilePdf className="forma-pdf-item-icon" />
+                      <div className="forma-pdf-item-details">
+                        <strong className="forma-pdf-item-name">
+                          {pdf.file.name}
+                        </strong>
+                        <span className="forma-pdf-item-size">
+                          {(pdf.file.size / 1024 / 1024).toFixed(2)} MB
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        className="forma-pdf-remove-btn"
+                        onClick={() => removePdf(pdf.id)}
+                      >
+                        <FaTrash />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* RIGHT COLUMN - RESULTS & SUBMISSION */}
+        <div className="forma-grid-right">
+          {/* HELPER CARD IF NO DATA */}
+          {!extractedData && (
+            <div className="forma-card forma-status-card">
+              <div className="forma-status-avatar">
+                <FaShieldAlt />
+              </div>
+              <div className="forma-status-info">
+                <h3 className="forma-status-heading">Automated Entity Recognition</h3>
+                <p className="forma-status-text">
+                  Write down your claim story or select a sample prompt. Our natural
+                  language engine will parse policy details, dates, financial limits,
+                  and categories instantly.
+                </p>
+                <div className="forma-info-notice">
+                  <FaInfoCircle /> Ready for immediate claim pre-filling.
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* EXTRACTED INFORMATION CARD */}
+          {extractedData && (
+            <div className="forma-card">
+              <div className="forma-card-header">
+                <div className="forma-card-title">
+                  <FaCheckCircle className="forma-card-icon forma-card-icon-success" />
+                  <div>
+                    <h2 className="forma-card-heading">Extracted Claim Fields</h2>
+                    <p className="forma-card-subheading">
+                      Review and click any field value to adjust before submitting.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* CATEGORY & ACCURACY METRICS */}
+              <div className="forma-category-pill-row">
+                <span className="forma-category-pill-label">Detected Category</span>
+                <strong className="forma-category-pill-tag">
+                  {category
+                    ? category.charAt(0).toUpperCase() + category.slice(1)
+                    : "Uncategorized"}
+                </strong>
+              </div>
+
+              <div className="forma-confidence-wrapper">
+                <div className="forma-confidence-metrics">
+                  <span>AI Data Confidence</span>
+                  <strong>{Math.round(confidence * 100)}% Match</strong>
+                </div>
+                <div className="forma-confidence-track">
+                  <div
+                    className="forma-confidence-fill-bar"
+                    style={{
+                      width: `${Math.min(Math.max(confidence * 100, 0), 100)}%`,
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* SUMMARY CALLOUT */}
+              {summary && (
+                <div className="forma-summary-callout">
+                  <h3 className="forma-summary-title">Executive AI Summary</h3>
+                  <p className="forma-summary-body">{summary}</p>
+                </div>
+              )}
+
+              {/* EXTRACTED FIELDS LIST WITH EDITABLE INLINE INPUTS */}
+              <div className="forma-fields-list-grid">
+                {Object.entries(extractedData).map(([key, value]) => {
+                  if (value === "" || value === null || value === undefined) {
+                    return null;
+                  }
+
+                  const isEditing = editingField === key;
+
+                  return (
+                    <div className="forma-field-item-card" key={key}>
+                      <div className="forma-field-header-row">
+                        <span className="forma-field-label-text">
+                          {formatFieldName(key)}
+                        </span>
+                        <button
+                          type="button"
+                          className="forma-field-edit-btn"
+                          onClick={() => setEditingField(isEditing ? null : key)}
+                        >
+                          <FaEdit /> {isEditing ? "Save" : "Edit"}
+                        </button>
+                      </div>
+
+                      {isEditing ? (
+                        <input
+                          type="text"
+                          className="forma-field-input"
+                          value={String(value)}
+                          onChange={(e) =>
+                            handleFieldValueChange(key, e.target.value)
+                          }
+                        />
+                      ) : (
+                        <strong className="forma-field-value-text">
+                          {String(value)}
+                        </strong>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* SUBMIT BUTTON / FINAL STATE */}
+              {!submitted ? (
+                <button
+                  type="button"
+                  className="forma-dark-submit-btn"
+                  onClick={handleSubmitClaim}
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <>
+                      <span className="forma-loader-spinner" /> Generating Official
+                      Claim...
+                    </>
+                  ) : (
+                    <>
+                      <FaCheckCircle /> Confirm & Submit Claim
+                    </>
+                  )}
+                </button>
+              ) : (
+                <div className="forma-submission-success-pane">
+                  <FaCheckCircle className="forma-success-pane-icon" />
+                  <h3 className="forma-success-pane-title">
+                    Claim Registered Successfully
+                  </h3>
+
+                  {claimNumber && (
+                    <p className="forma-success-pane-meta">
+                      Claim Reference Number: <strong>{claimNumber}</strong>
+                    </p>
+                  )}
+
+                  {claimId && (
+                    <p className="forma-success-pane-meta">
+                      Internal System ID: <strong>{claimId}</strong>
+                    </p>
+                  )}
+
+                  <div className="forma-success-button-group">
+                    {pdfUrl && (
+                      <>
+                        <button
+                          type="button"
+                          className="forma-secondary-action-btn"
+                          onClick={openPDF}
+                        >
+                          <FaExternalLinkAlt /> View PDF
+                        </button>
+                        <button
+                          type="button"
+                          className="forma-secondary-action-btn"
+                          onClick={downloadPDF}
+                        >
+                          <FaDownload /> Download Document
+                        </button>
+                      </>
+                    )}
+                    <button
+                      type="button"
+                      className="forma-secondary-action-btn"
+                      onClick={handleClear}
+                    >
+                      New File
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 };

@@ -4,9 +4,9 @@
 
 import express from "express";
 import cors from "cors";
-import dotenv from "dotenv";
 import helmet from "helmet";
 import morgan from "morgan";
+import path from "path";
 
 // ==========================================
 // Routes
@@ -24,12 +24,6 @@ import documentRoutes from "./routes/documentRoutes.js";
 // ==========================================
 
 import errorMiddleware from "./middleware/errorMiddleware.js";
-
-// ==========================================
-// Load Environment Variables
-// ==========================================
-
-dotenv.config();
 
 // ==========================================
 // Create Express Application
@@ -59,7 +53,7 @@ app.use(morgan("dev"));
 
 app.use(
   cors({
-    origin: process.env.CLIENT_ORIGIN || "http://localhost:5173",
+    origin: process.env.CLIENT_URL || "http://localhost:5173",
     credentials: true,
   })
 );
@@ -83,6 +77,17 @@ app.use(
     extended: true,
     limit: "10mb",
   })
+);
+
+// ==========================================
+// Static Files
+// ==========================================
+
+// Generated PDFs, uploaded documents, images, etc.
+
+app.use(
+  "/uploads",
+  express.static(path.join(process.cwd(), "uploads"))
 );
 
 /* ==========================================

@@ -1,16 +1,12 @@
+
 // ==========================================
 // Forma AI - Backend Server
 // ==========================================
 
-import dotenv from "dotenv";
+import "dotenv/config";
+
 import app from "./app.js";
 import connectDB from "./config/db.js";
-
-// ==========================================
-// Load Environment Variables
-// ==========================================
-
-dotenv.config();
 
 // ==========================================
 // Environment Variables
@@ -19,11 +15,61 @@ dotenv.config();
 const PORT = process.env.PORT || 5000;
 
 // ==========================================
+// Check Required Environment Variables
+// ==========================================
+
+console.log("=========================================");
+console.log("🔧 Forma AI Environment Check");
+console.log("=========================================");
+
+console.log(
+  "🔑 Gemini API Key:",
+  process.env.GEMINI_API_KEY ? "FOUND ✅" : "MISSING ❌"
+);
+
+console.log(
+  "🗄️ MongoDB URI:",
+  process.env.MONGO_URI ? "FOUND ✅" : "MISSING ❌"
+);
+
+console.log(
+  "🌐 Client URL:",
+  process.env.CLIENT_URL || "Not configured"
+);
+
+console.log(
+  "📦 Environment:",
+  process.env.NODE_ENV || "development"
+);
+
+console.log("=========================================");
+
+// ==========================================
 // Start Server
 // ==========================================
 
 const startServer = async () => {
   try {
+    // --------------------------------------
+    // Validate Gemini API Key
+    // --------------------------------------
+
+    if (!process.env.GEMINI_API_KEY) {
+      throw new Error(
+        "GEMINI_API_KEY is missing. Please check server/.env"
+      );
+    }
+
+    // --------------------------------------
+    // Validate MongoDB URI
+    // --------------------------------------
+
+    if (!process.env.MONGO_URI) {
+      throw new Error(
+        "MONGO_URI is missing. Please check server/.env"
+      );
+    }
+
     // --------------------------------------
     // Connect MongoDB
     // --------------------------------------
@@ -45,6 +91,7 @@ const startServer = async () => {
         `📦 Environment  : ${process.env.NODE_ENV || "development"}`
       );
       console.log(`📂 API Base URL : http://localhost:${PORT}/api`);
+      console.log("🤖 Gemini AI    : Configured ✅");
       console.log("=========================================");
     });
 
@@ -53,7 +100,9 @@ const startServer = async () => {
     // ======================================
 
     process.on("unhandledRejection", (error) => {
-      console.error("❌ Unhandled Rejection:");
+      console.error("=========================================");
+      console.error("❌ Unhandled Promise Rejection");
+      console.error("=========================================");
       console.error(error);
 
       server.close(() => {
@@ -66,7 +115,9 @@ const startServer = async () => {
     // ======================================
 
     process.on("uncaughtException", (error) => {
-      console.error("❌ Uncaught Exception:");
+      console.error("=========================================");
+      console.error("❌ Uncaught Exception");
+      console.error("=========================================");
       console.error(error);
 
       server.close(() => {
@@ -108,6 +159,7 @@ const startServer = async () => {
     console.error("❌ Failed to Start Forma AI Backend");
     console.error("=========================================");
     console.error("Error:", error.message);
+    console.error("=========================================");
 
     process.exit(1);
   }
@@ -118,3 +170,4 @@ const startServer = async () => {
 // ==========================================
 
 startServer();
+

@@ -1,8 +1,68 @@
+
 // ==========================================
 // Forma AI - Claim Model
 // ==========================================
 
 import mongoose from "mongoose";
+
+// ==========================================
+// Embedded Document Schema
+// ==========================================
+
+const claimDocumentSchema = new mongoose.Schema(
+  {
+    name: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+
+    url: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+
+    type: {
+      type: String,
+      default: "document",
+      trim: true,
+    },
+  },
+  {
+    _id: false,
+  }
+);
+
+// ==========================================
+// Embedded AI Analysis Schema
+// ==========================================
+
+const aiAnalysisSchema = new mongoose.Schema(
+  {
+    summary: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+
+    confidence: {
+      type: Number,
+      min: 0,
+      max: 1,
+      default: 0,
+    },
+
+    source: {
+      type: String,
+      default: "description",
+      trim: true,
+    },
+  },
+  {
+    _id: false,
+  }
+);
 
 // ==========================================
 // Claim Schema
@@ -37,7 +97,12 @@ const claimSchema = new mongoose.Schema(
 
     category: {
       type: String,
-      required: [true, "Insurance category is required."],
+
+      required: [
+        true,
+        "Insurance category is required.",
+      ],
+
       enum: {
         values: [
           "health",
@@ -46,9 +111,11 @@ const claimSchema = new mongoose.Schema(
           "travel",
           "life",
         ],
+
         message:
           "Invalid insurance category: {VALUE}.",
       },
+
       lowercase: true,
       trim: true,
     },
@@ -59,6 +126,7 @@ const claimSchema = new mongoose.Schema(
 
     status: {
       type: String,
+
       enum: {
         values: [
           "draft",
@@ -67,27 +135,17 @@ const claimSchema = new mongoose.Schema(
           "approved",
           "rejected",
         ],
+
         message:
           "Invalid claim status: {VALUE}.",
       },
+
       default: "draft",
     },
 
     // --------------------------------------
     // Dynamic Form Data
     // --------------------------------------
-    //
-    // This stores the complete dynamic insurance
-    // form submitted by the user.
-    //
-    // Example:
-    // {
-    //   policyNumber: "POL123",
-    //   vehicleNumber: "TS09AB1234",
-    //   accidentDate: "...",
-    //   damageType: "Windshield"
-    // }
-    //
 
     claimData: {
       type: mongoose.Schema.Types.Mixed,
@@ -98,17 +156,22 @@ const claimSchema = new mongoose.Schema(
     // Uploaded Documents
     // --------------------------------------
     //
-    // Document records are stored separately
-    // in the Document collection.
+    // Documents are embedded directly inside
+    // the claim document.
+    //
+    // Example:
+    //
+    // documents: [
+    //   {
+    //     name: "CLM-2026-0005.pdf",
+    //     url: "/uploads/pdfs/CLM-2026-0005.pdf",
+    //     type: "claim-pdf"
+    //   }
+    // ]
     //
 
     documents: {
-      type: [
-        {
-          type: mongoose.Schema.Types.ObjectId,
-          ref: "Document",
-        },
-      ],
+      type: [claimDocumentSchema],
       default: [],
     },
 
@@ -116,18 +179,21 @@ const claimSchema = new mongoose.Schema(
     // AI Analysis
     // --------------------------------------
     //
-    // AI analysis records are stored separately
-    // in the AIAnalysis collection.
+    // AI analysis is embedded directly inside
+    // the claim document.
+    //
+    // Example:
+    //
+    // aiAnalysis: {
+    //   summary: "...",
+    //   confidence: 0.98,
+    //   source: "description"
+    // }
     //
 
     aiAnalysis: {
-      type: [
-        {
-          type: mongoose.Schema.Types.ObjectId,
-          ref: "AIAnalysis",
-        },
-      ],
-      default: [],
+      type: aiAnalysisSchema,
+      default: () => ({}),
     },
 
     // --------------------------------------
@@ -146,8 +212,17 @@ const claimSchema = new mongoose.Schema(
 
     aiConfidence: {
       type: Number,
-      min: [0, "AI confidence cannot be less than 0."],
-      max: [1, "AI confidence cannot be greater than 1."],
+
+      min: [
+        0,
+        "AI confidence cannot be less than 0.",
+      ],
+
+      max: [
+        1,
+        "AI confidence cannot be greater than 1.",
+      ],
+
       default: null,
     },
 
@@ -157,8 +232,17 @@ const claimSchema = new mongoose.Schema(
 
     riskScore: {
       type: Number,
-      min: [0, "Risk score cannot be less than 0."],
-      max: [1, "Risk score cannot be greater than 1."],
+
+      min: [
+        0,
+        "Risk score cannot be less than 0.",
+      ],
+
+      max: [
+        1,
+        "Risk score cannot be greater than 1.",
+      ],
+
       default: null,
     },
 
@@ -168,6 +252,7 @@ const claimSchema = new mongoose.Schema(
 
     riskLevel: {
       type: String,
+
       enum: {
         values: [
           "low",
@@ -175,9 +260,11 @@ const claimSchema = new mongoose.Schema(
           "high",
           "unknown",
         ],
+
         message:
           "Invalid risk level: {VALUE}.",
       },
+
       default: "unknown",
     },
 
@@ -212,6 +299,16 @@ const claimSchema = new mongoose.Schema(
     },
 
     // --------------------------------------
+    // PDF URL
+    // --------------------------------------
+
+    pdfUrl: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+
+    // --------------------------------------
     // Decision Information
     // --------------------------------------
 
@@ -226,6 +323,7 @@ const claimSchema = new mongoose.Schema(
       default: null,
     },
   },
+
   {
     timestamps: true,
   }
@@ -236,12 +334,14 @@ const claimSchema = new mongoose.Schema(
 // ==========================================
 
 // User claims
+
 claimSchema.index({
   userId: 1,
   createdAt: -1,
 });
 
 // Category + status filtering
+
 claimSchema.index({
   category: 1,
   status: 1,
@@ -249,37 +349,76 @@ claimSchema.index({
 
 // Claim number lookup
 //
-// NOTE:
 // claimNumber already has unique: true,
 // which creates a unique index.
-// This explicit index is kept here because
-// the existing project may already depend on it.
+//
 
 claimSchema.index({
   claimNumber: 1,
 });
 
 // ==========================================
+// Automatically Set Submitted Date
+// ==========================================
+
+claimSchema.pre("save", function (next) {
+  if (
+    this.status === "submitted" &&
+    !this.submittedAt
+  ) {
+    this.submittedAt = new Date();
+  }
+
+  next();
+});
+
+// ==========================================
 // Pre-validation Logging
 // ==========================================
-//
-// This helps us identify exactly what MongoDB
-// is validating when a claim creation fails.
-//
 
 claimSchema.pre("validate", function (next) {
-  console.log("\n-----------------------------------------");
+  console.log("");
+  console.log("-----------------------------------------");
   console.log("🔍 CLAIM MODEL VALIDATION");
   console.log("-----------------------------------------");
-  console.log("Claim Number:", this.claimNumber);
-  console.log("User ID:", this.userId || "Guest");
-  console.log("Category:", this.category);
-  console.log("Status:", this.status);
+
+  console.log(
+    "Claim Number:",
+    this.claimNumber
+  );
+
+  console.log(
+    "User ID:",
+    this.userId || "Guest"
+  );
+
+  console.log(
+    "Category:",
+    this.category
+  );
+
+  console.log(
+    "Status:",
+    this.status
+  );
+
   console.log(
     "Claim Data:",
     this.claimData
   );
-  console.log("-----------------------------------------\n");
+
+  console.log(
+    "AI Analysis:",
+    this.aiAnalysis
+  );
+
+  console.log(
+    "Documents:",
+    this.documents
+  );
+
+  console.log("-----------------------------------------");
+  console.log("");
 
   next();
 });
@@ -298,3 +437,4 @@ const Claim = mongoose.model(
 // ==========================================
 
 export default Claim;
+

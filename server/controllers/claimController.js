@@ -1,3 +1,4 @@
+
 // ==========================================
 // Forma AI - Claim Controller
 // ==========================================
@@ -42,8 +43,17 @@ const createClaim = async (req, res) => {
   console.log("\n=========================================");
   console.log("📥 CREATE CLAIM REQUEST RECEIVED");
   console.log("=========================================");
-  console.log("Request Body:", JSON.stringify(req.body, null, 2));
-  console.log("User:", req.user || "No authenticated user");
+
+  console.log(
+    "Request Body:",
+    JSON.stringify(req.body, null, 2)
+  );
+
+  console.log(
+    "User:",
+    req.user || "No authenticated user"
+  );
+
   console.log("=========================================\n");
 
   try {
@@ -51,18 +61,24 @@ const createClaim = async (req, res) => {
     // Read request body
     // ------------------------------------------
 
-    const { category, claimData = {} } = req.body || {};
+    const {
+      category,
+      claimData = {},
+    } = req.body || {};
 
     // ------------------------------------------
     // Validate category
     // ------------------------------------------
 
     if (!category) {
-      console.error("❌ CREATE CLAIM FAILED: Category missing");
+      console.error(
+        "❌ CREATE CLAIM FAILED: Category missing"
+      );
 
       return res.status(400).json({
         success: false,
-        message: "Insurance category is required.",
+        message:
+          "Insurance category is required.",
       });
     }
 
@@ -82,7 +98,11 @@ const createClaim = async (req, res) => {
       "life",
     ];
 
-    if (!allowedCategories.includes(normalizedCategory)) {
+    if (
+      !allowedCategories.includes(
+        normalizedCategory
+      )
+    ) {
       console.error(
         "❌ CREATE CLAIM FAILED: Invalid category:",
         normalizedCategory
@@ -110,7 +130,8 @@ const createClaim = async (req, res) => {
 
       return res.status(400).json({
         success: false,
-        message: "Claim data must be a valid object.",
+        message:
+          "Claim data must be a valid object.",
       });
     }
 
@@ -120,8 +141,16 @@ const createClaim = async (req, res) => {
 
     const userId = getUserId(req);
 
-    console.log("👤 User ID:", userId || "Guest / Prototype Mode");
-    console.log("📂 Category:", normalizedCategory);
+    console.log(
+      "👤 User ID:",
+      userId || "Guest / Prototype Mode"
+    );
+
+    console.log(
+      "📂 Category:",
+      normalizedCategory
+    );
+
     console.log(
       "📋 Claim Data Keys:",
       Object.keys(claimData)
@@ -131,42 +160,84 @@ const createClaim = async (req, res) => {
     // Generate claim number
     // ------------------------------------------
 
-    console.log("🔢 Generating claim number...");
+    console.log(
+      "🔢 Generating claim number..."
+    );
 
-    const claimNumber = await generateClaimNumber();
+    const claimNumber =
+      await generateClaimNumber();
 
-    console.log("🔢 Generated Claim Number:", claimNumber);
+    console.log(
+      "🔢 Generated Claim Number:",
+      claimNumber
+    );
 
     // ------------------------------------------
     // Prepare claim object
     // ------------------------------------------
+    //
+    // IMPORTANT:
+    //
+    // aiAnalysis is an EMBEDDED OBJECT in the
+    // current Claim model.
+    //
+    // Therefore DO NOT use:
+    //
+    // aiAnalysis: []
+    //
+    // ------------------------------------------
 
     const claimPayload = {
       claimNumber,
+
       category: normalizedCategory,
+
       status: "draft",
+
       claimData,
+
+      // Embedded documents
       documents: [],
-      aiAnalysis: [],
+
+      // Embedded AI analysis object
+      aiAnalysis: {
+        summary: "",
+        confidence: 0,
+        source: "manual",
+      },
+
+      // Separate convenient AI fields
       aiSummary: "",
+
       aiConfidence: null,
+
+      // Risk information
       riskScore: null,
+
       riskLevel: "unknown",
+
+      // Reviewer information
       reviewerNotes: "",
+
       reviewedBy: null,
+
       reviewedAt: null,
+
+      // Submission information
       submittedAt: null,
+
+      // PDF
+      pdfUrl: "",
+
+      // Decision information
       decisionReason: "",
+
       decisionDate: null,
     };
 
     // ------------------------------------------
-    // Only add userId when we actually have one
+    // Only add userId when available
     // ------------------------------------------
-    //
-    // This avoids sending null into a required /
-    // ObjectId field if the schema does not allow it.
-    //
 
     if (userId) {
       claimPayload.userId = userId;
@@ -174,23 +245,50 @@ const createClaim = async (req, res) => {
 
     console.log(
       "📦 Claim Payload:",
-      JSON.stringify(claimPayload, null, 2)
+      JSON.stringify(
+        claimPayload,
+        null,
+        2
+      )
     );
 
     // ------------------------------------------
     // Create claim
     // ------------------------------------------
 
-    console.log("💾 Saving claim to MongoDB...");
+    console.log(
+      "💾 Saving claim to MongoDB..."
+    );
 
-    const claim = await Claim.create(claimPayload);
+    const claim =
+      await Claim.create(claimPayload);
 
-    console.log("=========================================");
-    console.log("✅ CLAIM CREATED SUCCESSFULLY");
-    console.log("Claim ID:", claim._id);
-    console.log("Claim Number:", claim.claimNumber);
-    console.log("Status:", claim.status);
-    console.log("=========================================\n");
+    console.log(
+      "========================================="
+    );
+
+    console.log(
+      "✅ CLAIM CREATED SUCCESSFULLY"
+    );
+
+    console.log(
+      "Claim ID:",
+      claim._id
+    );
+
+    console.log(
+      "Claim Number:",
+      claim.claimNumber
+    );
+
+    console.log(
+      "Status:",
+      claim.status
+    );
+
+    console.log(
+      "=========================================\n"
+    );
 
     // ------------------------------------------
     // Response
@@ -198,7 +296,10 @@ const createClaim = async (req, res) => {
 
     return res.status(201).json({
       success: true,
-      message: "Claim created successfully.",
+
+      message:
+        "Claim created successfully.",
+
       claim,
     });
   } catch (error) {
@@ -206,19 +307,46 @@ const createClaim = async (req, res) => {
     // Detailed Error Logging
     // ==========================================
 
-    console.error("\n=========================================");
-    console.error("❌ CREATE CLAIM ERROR");
-    console.error("=========================================");
+    console.error(
+      "\n========================================="
+    );
 
-    console.error("Error Name:", error.name);
-    console.error("Error Message:", error.message);
-    console.error("Error Code:", error.code);
-    console.error("Full Error:", error);
+    console.error(
+      "❌ CREATE CLAIM ERROR"
+    );
+
+    console.error(
+      "========================================="
+    );
+
+    console.error(
+      "Error Name:",
+      error.name
+    );
+
+    console.error(
+      "Error Message:",
+      error.message
+    );
+
+    console.error(
+      "Error Code:",
+      error.code
+    );
+
+    console.error(
+      "Full Error:",
+      error
+    );
 
     if (error.errors) {
-      console.error("Mongoose Validation Errors:");
+      console.error(
+        "Mongoose Validation Errors:"
+      );
 
-      Object.entries(error.errors).forEach(
+      Object.entries(
+        error.errors
+      ).forEach(
         ([field, fieldError]) => {
           console.error(
             `  ${field}: ${fieldError.message}`
@@ -227,8 +355,14 @@ const createClaim = async (req, res) => {
       );
     }
 
-    console.error("Stack:", error.stack);
-    console.error("=========================================\n");
+    console.error(
+      "Stack:",
+      error.stack
+    );
+
+    console.error(
+      "=========================================\n"
+    );
 
     // ==========================================
     // Duplicate Claim Number
@@ -237,8 +371,10 @@ const createClaim = async (req, res) => {
     if (error.code === 11000) {
       return res.status(409).json({
         success: false,
+
         message:
           "Claim number already exists. Please try again.",
+
         error: error.message,
       });
     }
@@ -247,17 +383,24 @@ const createClaim = async (req, res) => {
     // Mongoose Validation Error
     // ==========================================
 
-    if (error.name === "ValidationError") {
-      const validationErrors = Object.values(
-        error.errors || {}
-      ).map((item) => ({
-        field: item.path,
-        message: item.message,
-      }));
+    if (
+      error.name ===
+      "ValidationError"
+    ) {
+      const validationErrors =
+        Object.values(
+          error.errors || {}
+        ).map((item) => ({
+          field: item.path,
+          message: item.message,
+        }));
 
       return res.status(400).json({
         success: false,
-        message: "Claim validation failed.",
+
+        message:
+          "Claim validation failed.",
+
         errors: validationErrors,
       });
     }
@@ -266,21 +409,30 @@ const createClaim = async (req, res) => {
     // Invalid ObjectId
     // ==========================================
 
-    if (error.name === "CastError") {
+    if (
+      error.name ===
+      "CastError"
+    ) {
       return res.status(400).json({
         success: false,
-        message: "Invalid claim data.",
+
+        message:
+          "Invalid claim data.",
+
         error: error.message,
       });
     }
 
     // ==========================================
-    // Other errors
+    // Other Errors
     // ==========================================
 
     return res.status(500).json({
       success: false,
-      message: "Unable to create claim.",
+
+      message:
+        "Unable to create claim.",
+
       error: error.message,
     });
   }
@@ -297,22 +449,39 @@ const getClaims = async (req, res) => {
 
     let query = {};
 
+    // ------------------------------------------
+    // Authenticated user
+    // ------------------------------------------
+
     if (userId) {
       query = {
         $or: [
-          { userId },
-          { userId: null },
+          {
+            userId,
+          },
+          {
+            userId: null,
+          },
         ],
       };
     }
 
-    const claims = await Claim.find(query)
-      .sort({ createdAt: -1 })
-      .lean();
+    // ------------------------------------------
+    // Fetch claims
+    // ------------------------------------------
+
+    const claims =
+      await Claim.find(query)
+        .sort({
+          createdAt: -1,
+        })
+        .lean();
 
     return res.status(200).json({
       success: true,
+
       count: claims.length,
+
       claims,
     });
   } catch (error) {
@@ -323,7 +492,10 @@ const getClaims = async (req, res) => {
 
     return res.status(500).json({
       success: false,
-      message: "Unable to fetch claims.",
+
+      message:
+        "Unable to fetch claims.",
+
       error: error.message,
     });
   }
@@ -334,22 +506,42 @@ const getClaims = async (req, res) => {
 // GET /api/claims/:id
 // ==========================================
 
-const getClaimById = async (req, res) => {
+const getClaimById = async (
+  req,
+  res
+) => {
   try {
     const { id } = req.params;
 
-    const claim = await Claim.findById(id).lean();
+    // ------------------------------------------
+    // Find claim
+    // ------------------------------------------
+
+    const claim =
+      await Claim.findById(id).lean();
 
     if (!claim) {
       return res.status(404).json({
         success: false,
-        message: "Claim not found.",
+
+        message:
+          "Claim not found.",
       });
     }
 
-    if (!canAccessClaim(claim, req)) {
+    // ------------------------------------------
+    // Check access
+    // ------------------------------------------
+
+    if (
+      !canAccessClaim(
+        claim,
+        req
+      )
+    ) {
       return res.status(403).json({
         success: false,
+
         message:
           "You are not authorized to access this claim.",
       });
@@ -357,6 +549,7 @@ const getClaimById = async (req, res) => {
 
     return res.status(200).json({
       success: true,
+
       claim,
     });
   } catch (error) {
@@ -367,7 +560,10 @@ const getClaimById = async (req, res) => {
 
     return res.status(500).json({
       success: false,
-      message: "Unable to fetch claim.",
+
+      message:
+        "Unable to fetch claim.",
+
       error: error.message,
     });
   }
@@ -378,51 +574,94 @@ const getClaimById = async (req, res) => {
 // PUT /api/claims/:id
 // ==========================================
 
-const updateClaim = async (req, res) => {
+const updateClaim = async (
+  req,
+  res
+) => {
   try {
     const { id } = req.params;
-    const { claimData = {} } = req.body || {};
 
-    const claim = await Claim.findById(id);
+    const {
+      claimData = {},
+    } = req.body || {};
+
+    // ------------------------------------------
+    // Find claim
+    // ------------------------------------------
+
+    const claim =
+      await Claim.findById(id);
 
     if (!claim) {
       return res.status(404).json({
         success: false,
-        message: "Claim not found.",
+
+        message:
+          "Claim not found.",
       });
     }
 
-    if (!canAccessClaim(claim, req)) {
+    // ------------------------------------------
+    // Check access
+    // ------------------------------------------
+
+    if (
+      !canAccessClaim(
+        claim,
+        req
+      )
+    ) {
       return res.status(403).json({
         success: false,
+
         message:
           "You are not authorized to update this claim.",
       });
     }
 
+    // ------------------------------------------
+    // Prevent editing finalized claims
+    // ------------------------------------------
+
     if (
-      ["approved", "rejected"].includes(
+      [
+        "approved",
+        "rejected",
+      ].includes(
         claim.status
       )
     ) {
       return res.status(400).json({
         success: false,
+
         message:
           "Approved or rejected claims cannot be modified.",
       });
     }
 
+    // ------------------------------------------
+    // Validate claimData
+    // ------------------------------------------
+
     if (
-      typeof claimData !== "object" ||
-      Array.isArray(claimData) ||
+      typeof claimData !==
+        "object" ||
+      Array.isArray(
+        claimData
+      ) ||
       claimData === null
     ) {
       return res.status(400).json({
         success: false,
+
         message:
           "claimData must be a valid object.",
       });
     }
+
+    // ------------------------------------------
+    // Merge existing data
+    // ------------------------------------------
 
     const existingClaimData =
       claim.claimData || {};
@@ -438,6 +677,10 @@ const updateClaim = async (req, res) => {
       ...claimData,
     };
 
+    // ------------------------------------------
+    // Save
+    // ------------------------------------------
+
     await claim.save();
 
     console.log(
@@ -447,8 +690,10 @@ const updateClaim = async (req, res) => {
 
     return res.status(200).json({
       success: true,
+
       message:
         "Claim updated successfully.",
+
       claim,
     });
   } catch (error) {
@@ -457,24 +702,34 @@ const updateClaim = async (req, res) => {
       error
     );
 
-    if (error.name === "ValidationError") {
-      const validationErrors = Object.values(
-        error.errors || {}
-      ).map((item) => ({
-        field: item.path,
-        message: item.message,
-      }));
+    if (
+      error.name ===
+      "ValidationError"
+    ) {
+      const validationErrors =
+        Object.values(
+          error.errors || {}
+        ).map((item) => ({
+          field: item.path,
+          message: item.message,
+        }));
 
       return res.status(400).json({
         success: false,
-        message: "Claim validation failed.",
+
+        message:
+          "Claim validation failed.",
+
         errors: validationErrors,
       });
     }
 
     return res.status(500).json({
       success: false,
-      message: "Unable to update claim.",
+
+      message:
+        "Unable to update claim.",
+
       error: error.message,
     });
   }
@@ -485,63 +740,121 @@ const updateClaim = async (req, res) => {
 // POST /api/claims/:id/submit
 // ==========================================
 
-const submitClaim = async (req, res) => {
+const submitClaim = async (
+  req,
+  res
+) => {
   try {
     const { id } = req.params;
 
-    const claim = await Claim.findById(id);
+    // ------------------------------------------
+    // Find claim
+    // ------------------------------------------
+
+    const claim =
+      await Claim.findById(id);
 
     if (!claim) {
       return res.status(404).json({
         success: false,
-        message: "Claim not found.",
+
+        message:
+          "Claim not found.",
       });
     }
 
-    if (!canAccessClaim(claim, req)) {
+    // ------------------------------------------
+    // Check access
+    // ------------------------------------------
+
+    if (
+      !canAccessClaim(
+        claim,
+        req
+      )
+    ) {
       return res.status(403).json({
         success: false,
+
         message:
           "You are not authorized to submit this claim.",
       });
     }
 
-    if (claim.status !== "draft") {
+    // ------------------------------------------
+    // Check status
+    // ------------------------------------------
+
+    if (
+      claim.status !==
+      "draft"
+    ) {
       return res.status(400).json({
         success: false,
+
         message:
           `Claim cannot be submitted because its current status is "${claim.status}".`,
       });
     }
 
+    // ------------------------------------------
+    // Validate claim data
+    // ------------------------------------------
+
     if (
       !claim.claimData ||
-      Object.keys(claim.claimData).length === 0
+      Object.keys(
+        claim.claimData
+      ).length === 0
     ) {
       return res.status(400).json({
         success: false,
+
         message:
           "Claim data is empty. Please complete the form before submitting.",
       });
     }
 
-    claim.status = "submitted";
-    claim.submittedAt = new Date();
+    // ------------------------------------------
+    // Submit claim
+    // ------------------------------------------
+
+    claim.status =
+      "submitted";
+
+    claim.submittedAt =
+      new Date();
 
     await claim.save();
 
     console.log(
       "========================================="
     );
-    console.log("✅ CLAIM SUBMITTED");
-    console.log("Claim Number:", claim.claimNumber);
-    console.log("Claim ID:", claim._id);
-    console.log("=========================================");
+
+    console.log(
+      "✅ CLAIM SUBMITTED"
+    );
+
+    console.log(
+      "Claim Number:",
+      claim.claimNumber
+    );
+
+    console.log(
+      "Claim ID:",
+      claim._id
+    );
+
+    console.log(
+      "========================================="
+    );
 
     return res.status(200).json({
       success: true,
+
       message:
         "Claim submitted successfully.",
+
       claim,
     });
   } catch (error) {
@@ -550,24 +863,34 @@ const submitClaim = async (req, res) => {
       error
     );
 
-    if (error.name === "ValidationError") {
-      const validationErrors = Object.values(
-        error.errors || {}
-      ).map((item) => ({
-        field: item.path,
-        message: item.message,
-      }));
+    if (
+      error.name ===
+      "ValidationError"
+    ) {
+      const validationErrors =
+        Object.values(
+          error.errors || {}
+        ).map((item) => ({
+          field: item.path,
+          message: item.message,
+        }));
 
       return res.status(400).json({
         success: false,
-        message: "Claim validation failed.",
+
+        message:
+          "Claim validation failed.",
+
         errors: validationErrors,
       });
     }
 
     return res.status(500).json({
       success: false,
-      message: "Unable to submit claim.",
+
+      message:
+        "Unable to submit claim.",
+
       error: error.message,
     });
   }
@@ -578,36 +901,70 @@ const submitClaim = async (req, res) => {
 // DELETE /api/claims/:id
 // ==========================================
 
-const deleteClaim = async (req, res) => {
+const deleteClaim = async (
+  req,
+  res
+) => {
   try {
     const { id } = req.params;
 
-    const claim = await Claim.findById(id);
+    // ------------------------------------------
+    // Find claim
+    // ------------------------------------------
+
+    const claim =
+      await Claim.findById(id);
 
     if (!claim) {
       return res.status(404).json({
         success: false,
-        message: "Claim not found.",
+
+        message:
+          "Claim not found.",
       });
     }
 
-    if (!canAccessClaim(claim, req)) {
+    // ------------------------------------------
+    // Check access
+    // ------------------------------------------
+
+    if (
+      !canAccessClaim(
+        claim,
+        req
+      )
+    ) {
       return res.status(403).json({
         success: false,
+
         message:
           "You are not authorized to delete this claim.",
       });
     }
 
-    if (claim.status !== "draft") {
+    // ------------------------------------------
+    // Only drafts can be deleted
+    // ------------------------------------------
+
+    if (
+      claim.status !==
+      "draft"
+    ) {
       return res.status(400).json({
         success: false,
+
         message:
           "Only draft claims can be deleted.",
       });
     }
 
-    await Claim.findByIdAndDelete(id);
+    // ------------------------------------------
+    // Delete
+    // ------------------------------------------
+
+    await Claim.findByIdAndDelete(
+      id
+    );
 
     console.log(
       "🗑️ CLAIM DELETED:",
@@ -616,6 +973,7 @@ const deleteClaim = async (req, res) => {
 
     return res.status(200).json({
       success: true,
+
       message:
         "Claim deleted successfully.",
     });
@@ -627,8 +985,10 @@ const deleteClaim = async (req, res) => {
 
     return res.status(500).json({
       success: false,
+
       message:
         "Unable to delete claim.",
+
       error: error.message,
     });
   }
@@ -644,32 +1004,83 @@ const getClaimsByCategory = async (
   res
 ) => {
   try {
-    const { category } = req.params;
+    const { category } =
+      req.params;
 
-    const normalizedCategory = String(category)
-      .trim()
-      .toLowerCase();
+    // ------------------------------------------
+    // Normalize category
+    // ------------------------------------------
 
-    const userId = getUserId(req);
+    const normalizedCategory =
+      String(category)
+        .trim()
+        .toLowerCase();
+
+    const allowedCategories = [
+      "health",
+      "vehicle",
+      "property",
+      "travel",
+      "life",
+    ];
+
+    if (
+      !allowedCategories.includes(
+        normalizedCategory
+      )
+    ) {
+      return res.status(400).json({
+        success: false,
+
+        message:
+          `Invalid insurance category "${normalizedCategory}".`,
+      });
+    }
+
+    // ------------------------------------------
+    // Get user
+    // ------------------------------------------
+
+    const userId =
+      getUserId(req);
+
+    // ------------------------------------------
+    // Build query
+    // ------------------------------------------
 
     const query = {
-      category: normalizedCategory,
+      category:
+        normalizedCategory,
     };
 
     if (userId) {
       query.$or = [
-        { userId },
-        { userId: null },
+        {
+          userId,
+        },
+        {
+          userId: null,
+        },
       ];
     }
 
-    const claims = await Claim.find(query)
-      .sort({ createdAt: -1 })
-      .lean();
+    // ------------------------------------------
+    // Fetch claims
+    // ------------------------------------------
+
+    const claims =
+      await Claim.find(query)
+        .sort({
+          createdAt: -1,
+        })
+        .lean();
 
     return res.status(200).json({
       success: true,
-      count: claims.length,
+
+      count:
+        claims.length,
+
       claims,
     });
   } catch (error) {
@@ -680,8 +1091,10 @@ const getClaimsByCategory = async (
 
     return res.status(500).json({
       success: false,
+
       message:
         "Unable to fetch category claims.",
+
       error: error.message,
     });
   }
@@ -700,3 +1113,4 @@ export {
   deleteClaim,
   getClaimsByCategory,
 };
+
