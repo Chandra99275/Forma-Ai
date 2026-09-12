@@ -18,13 +18,13 @@ const API = axios.create({
 API.interceptors.request.use(
   (config) => {
     try {
-      const user = JSON.parse(localStorage.getItem("formaUser"));
+      const token = localStorage.getItem("token");
 
-      if (user?.token) {
-        config.headers.Authorization = `Bearer ${user.token}`;
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
       }
     } catch (error) {
-      console.error("❌ Error reading formaUser:", error);
+      console.error("❌ Error reading token from localStorage:", error);
     }
 
     return config;
