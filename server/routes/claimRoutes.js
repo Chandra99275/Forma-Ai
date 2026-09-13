@@ -86,6 +86,18 @@ router.put(
 router.post(
   "/:id/submit",
   validateClaimId,
+  (req, res, next) => {
+    console.log("\n=========================================");
+    console.log("📤 CLAIM SUBMIT ROUTE HIT");
+    console.log("=========================================");
+    console.log("Method:", req.method);
+    console.log("URL:", req.originalUrl);
+    console.log("Claim ID:", req.params.id);
+    console.log("User:", req.user || "Guest / Prototype Mode");
+    console.log("=========================================\n");
+
+    next();
+  },
   submitClaim
 );
 
@@ -99,5 +111,9 @@ router.delete(
   validateClaimId,
   deleteClaim
 );
+
+// ==========================================
+// EXPORT ROUTER
+// ==========================================
 
 export default router;

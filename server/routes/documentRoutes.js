@@ -1,3 +1,4 @@
+
 // ==========================================
 // Forma AI - Document Routes
 // ==========================================
@@ -26,13 +27,17 @@ import upload from "../middleware/uploadMiddleware.js";
 const router = express.Router();
 
 // ==========================================
-// Upload Document
+// Upload Documents
 // POST /api/documents/upload
+// ==========================================
+// Accepts multiple documents.
+// Frontend field name must be: "document"
+// Maximum 10 files per request.
 // ==========================================
 
 router.post(
   "/upload",
-  upload.single("document"),
+  upload.array("document", 10),
   validateDocumentUpload,
   uploadDocument
 );
@@ -99,3 +104,4 @@ router.patch(
 // ==========================================
 
 export default router;
+
