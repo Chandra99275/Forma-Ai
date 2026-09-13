@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { NavLink, Link, useNavigate } from "react-router-dom";
+import { useAuthStore } from "../store";
 import "./Profile.css";
 
 import {
@@ -27,6 +28,7 @@ import {
 
 const Profile = () => {
   const navigate = useNavigate();
+  const logout = useAuthStore((state) => state.logout);
 
   const [user, setUser] = useState({
     fullName: "Forma User",
@@ -75,7 +77,7 @@ const Profile = () => {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem("user");
+    logout();
     navigate("/login");
   };
 
