@@ -235,15 +235,40 @@ const formSchema = new mongoose.Schema(
  */
 formSchema.pre("validate", function (next) {
   const questionIds = this.questions.map((question) => question.id);
-
   const uniqueQuestionIds = new Set(questionIds);
 
+  // Prevent duplicate question IDs.
   if (questionIds.length !== uniqueQuestionIds.size) {
     this.invalidate(
       "questions",
       "Question IDs must be unique within a form."
     );
   }
+
+  // Validate conditional visibility references.
+  this.questions.forEach((question) => {
+    if (!question.showIf) {
+      return;
+    }
+
+    const { questionId } = question.showIf;
+
+    // The referenced question must exist in the same form.
+    if (!questionIds.includes(questionId)) {
+      this.invalidate(
+        "questions",
+        `Question "${question.id}" references a question that does not exist.`
+      );
+    }
+
+    // A question cannot depend on itself.
+    if (questionId === question.id) {
+      this.invalidate(
+        "questions",
+        `Question "${question.id}" cannot reference itself in showIf.`
+      );
+    }
+  });
 
   next();
 });
