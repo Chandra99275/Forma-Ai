@@ -1,7 +1,7 @@
-
 // ==========================================
 // Forma AI - Dynamic Insurance Claim Forms
 // ==========================================
+
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "./DynamicForms.css";
@@ -26,6 +26,7 @@ import {
   FaDownload,
   FaEye,
   FaTimes,
+  FaCheck,
 } from "react-icons/fa";
 
 // Components
@@ -45,14 +46,10 @@ import {
 import { generateClaimPDF } from "../services/pdfService";
 
 // ==========================================
-// Component
+// COMPONENT
 // ==========================================
 
 const DynamicForms = () => {
-  // ==========================================
-  // NAVIGATION
-  // ==========================================
-
   const navigate = useNavigate();
 
   // ==========================================
@@ -65,7 +62,8 @@ const DynamicForms = () => {
   const [applicationMode, setApplicationMode] =
     useState("manual");
 
-  const [currentStep, setCurrentStep] = useState(1);
+  const [currentStep, setCurrentStep] =
+    useState(1);
 
   const [formData, setFormData] = useState({
     applicantName: "",
@@ -78,22 +76,43 @@ const DynamicForms = () => {
   const [categoryFormData, setCategoryFormData] =
     useState({});
 
-  const [claimId, setClaimId] = useState(null);
+  const [claimId, setClaimId] =
+    useState(null);
 
-  const [claimNumber, setClaimNumber] = useState("");
+  const [claimNumber, setClaimNumber] =
+    useState("");
 
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] =
+    useState(false);
 
-  const [message, setMessage] = useState("");
+  const [message, setMessage] =
+    useState("");
 
-  const [error, setError] = useState("");
+  const [error, setError] =
+    useState("");
 
-  // PDF states
-  const [pdfUrl, setPdfUrl] = useState("");
+  // ==========================================
+  // PDF STATES
+  // ==========================================
 
-  const [pdfFileName, setPdfFileName] = useState("");
+  const [pdfUrl, setPdfUrl] =
+    useState("");
 
-  const [showPdf, setShowPdf] = useState(false);
+  const [pdfFileName, setPdfFileName] =
+    useState("");
+
+  const [showPdf, setShowPdf] =
+    useState(false);
+
+  // ==========================================
+  // SUCCESS MODAL STATE
+  // ==========================================
+
+  const [showSuccessModal, setShowSuccessModal] =
+    useState(false);
+
+  const [successClaimNumber, setSuccessClaimNumber] =
+    useState("");
 
   // ==========================================
   // INSURANCE CATEGORIES
@@ -190,6 +209,10 @@ const DynamicForms = () => {
 
     setShowPdf(false);
 
+    setShowSuccessModal(false);
+
+    setSuccessClaimNumber("");
+
     setCurrentStep(1);
   };
 
@@ -220,14 +243,18 @@ const DynamicForms = () => {
       console.log(
         "========================================="
       );
+
       console.log("📤 SAVE CLAIM");
+
       console.log(
         "========================================="
       );
+
       console.log(
         "Category:",
         selectedCategory
       );
+
       console.log(
         "Claim Data:",
         completeClaimData
@@ -236,7 +263,7 @@ const DynamicForms = () => {
       let result;
 
       // ========================================
-      // CREATE
+      // CREATE CLAIM
       // ========================================
 
       if (!claimId) {
@@ -269,13 +296,14 @@ const DynamicForms = () => {
       }
 
       // ========================================
-      // UPDATE
+      // UPDATE CLAIM
       // ========================================
 
       else {
         result = await updateClaim(
           claimId,
-          completeClaimData
+          completeClaimData,
+          selectedCategory
         );
 
         if (result?.claim?.claimNumber) {
@@ -364,6 +392,32 @@ const DynamicForms = () => {
   };
 
   // ==========================================
+  // CLOSE SUCCESS MODAL
+  // ==========================================
+
+  const handleCloseSuccessModal = () => {
+    setShowSuccessModal(false);
+  };
+
+  // ==========================================
+  // VIEW PDF FROM SUCCESS MODAL
+  // ==========================================
+
+  const handleSuccessViewPDF = () => {
+    setShowSuccessModal(false);
+
+    setShowPdf(true);
+
+    if (pdfUrl) {
+      window.open(
+        pdfUrl,
+        "_blank",
+        "noopener,noreferrer"
+      );
+    }
+  };
+
+  // ==========================================
   // SUBMIT CLAIM + GENERATE PDF
   // ==========================================
 
@@ -379,14 +433,18 @@ const DynamicForms = () => {
       console.log(
         "========================================="
       );
+
       console.log("🚀 SUBMITTING CLAIM");
+
       console.log(
         "========================================="
       );
+
       console.log(
         "Category:",
         selectedCategory
       );
+
       console.log(
         "Complete Claim Data:",
         completeClaimData
@@ -441,7 +499,8 @@ const DynamicForms = () => {
         const updateResult =
           await updateClaim(
             currentClaimId,
-            completeClaimData
+            completeClaimData,
+            selectedCategory
           );
 
         console.log(
@@ -557,25 +616,38 @@ const DynamicForms = () => {
       setShowPdf(true);
 
       // ========================================
-      // SUCCESS
+      // SUCCESS MESSAGE
       // ========================================
 
       setMessage(
         `Claim submitted successfully — ${finalClaimNumber}`
       );
 
+      setSuccessClaimNumber(
+        finalClaimNumber
+      );
+
       setCurrentStep(5);
+
+      // ========================================
+      // SHOW SUCCESS POPUP
+      // ========================================
+
+      setShowSuccessModal(true);
 
       console.log(
         "========================================="
       );
+
       console.log(
         "🎉 CLAIM SUBMITTED SUCCESSFULLY"
       );
+
       console.log(
         "Claim Number:",
         finalClaimNumber
       );
+
       console.log(
         "========================================="
       );
@@ -642,7 +714,7 @@ const DynamicForms = () => {
   };
 
   // ==========================================
-  // CLEAN PDF URL WHEN COMPONENT UNMOUNTS
+  // CLEAN PDF URL
   // ==========================================
 
   useEffect(() => {
@@ -720,6 +792,7 @@ const DynamicForms = () => {
 
             <div>
               <h2>120+</h2>
+
               <span>
                 Insurance Templates
               </span>
@@ -731,6 +804,7 @@ const DynamicForms = () => {
 
             <div>
               <h2>98%</h2>
+
               <span>
                 AI Accuracy
               </span>
@@ -742,6 +816,7 @@ const DynamicForms = () => {
 
             <div>
               <h2>25,000+</h2>
+
               <span>
                 Claims Submitted
               </span>
@@ -753,6 +828,7 @@ const DynamicForms = () => {
 
             <div>
               <h2>95%</h2>
+
               <span>
                 Success Rate
               </span>
@@ -843,9 +919,7 @@ const DynamicForms = () => {
                 : "modeCard"
             }
             onClick={() =>
-              setApplicationMode(
-                "manual"
-              )
+              setApplicationMode("manual")
             }
           >
             <FaKeyboard className="modeIcon" />
@@ -1091,9 +1165,7 @@ const DynamicForms = () => {
             }
           />
 
-          {/* ====================================
-              STATUS
-          ==================================== */}
+          {/* STATUS */}
 
           {(message ||
             error ||
@@ -1561,6 +1633,171 @@ const DynamicForms = () => {
         </div>
 
       </section>
+
+      {/* ======================================
+          SUCCESS MODAL
+      ====================================== */}
+
+      {showSuccessModal && (
+
+        <div
+          className="successModalOverlay"
+          onClick={handleCloseSuccessModal}
+        >
+
+          <div
+            className="successModal"
+            onClick={(event) =>
+              event.stopPropagation()
+            }
+          >
+
+            {/* SUCCESS ICON */}
+
+            <div className="successIconWrapper">
+
+              <div className="successIconCircle">
+
+                <FaCheck />
+
+              </div>
+
+            </div>
+
+            {/* SUCCESS CONTENT */}
+
+            <div className="successModalContent">
+
+              <div className="successBadge">
+
+                <FaCheckCircle />
+
+                SUCCESSFUL
+
+              </div>
+
+              <h2>
+                Claim Submitted Successfully!
+              </h2>
+
+              <p className="successDescription">
+                Your insurance claim has been
+                successfully submitted to Forma AI.
+              </p>
+
+              {/* CLAIM NUMBER */}
+
+              <div className="successClaimBox">
+
+                <span>
+                  CLAIM NUMBER
+                </span>
+
+                <strong>
+                  {successClaimNumber ||
+                    claimNumber}
+                </strong>
+
+              </div>
+
+              {/* STATUS */}
+
+              <div className="successStatusRow">
+
+                <div className="successStatusItem">
+
+                  <FaCheckCircle />
+
+                  <div>
+
+                    <span>
+                      Submission Status
+                    </span>
+
+                    <strong>
+                      Submitted
+                    </strong>
+
+                  </div>
+
+                </div>
+
+                <div className="successStatusItem">
+
+                  <FaFilePdf />
+
+                  <div>
+
+                    <span>
+                      Claim Document
+                    </span>
+
+                    <strong>
+                      PDF Ready
+                    </strong>
+
+                  </div>
+
+                </div>
+
+              </div>
+
+              <p className="successNote">
+                Your claim has been recorded
+                successfully. You can download
+                or view your claim PDF below.
+              </p>
+
+              {/* SUCCESS ACTIONS */}
+
+              <div className="successModalActions">
+
+                <button
+                  type="button"
+                  className="successPdfButton"
+                  onClick={
+                    handleSuccessViewPDF
+                  }
+                >
+                  <FaFilePdf />
+
+                  View Claim PDF
+                </button>
+
+                <button
+                  type="button"
+                  className="successOkButton"
+                  onClick={
+                    handleCloseSuccessModal
+                  }
+                >
+                  <FaCheck />
+
+                  OK
+                </button>
+
+              </div>
+
+            </div>
+
+            {/* CLOSE BUTTON */}
+
+            <button
+              type="button"
+              className="successCloseButton"
+              onClick={
+                handleCloseSuccessModal
+              }
+              aria-label="Close success message"
+            >
+              <FaTimes />
+            </button>
+
+          </div>
+
+        </div>
+
+      )}
 
     </div>
   );

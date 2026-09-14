@@ -1,7 +1,6 @@
-
 // ==========================================
 // Forma AI - Submissions Page
-// Backend + PDF Connected Version
+// Complete CRUD + Dynamic Form Editor + PDF
 // ==========================================
 
 import React, {
@@ -37,6 +36,11 @@ import {
   FaTimes,
   FaSpinner,
   FaFilePdf,
+  FaEdit,
+  FaTrash,
+  FaSave,
+  FaExclamationTriangle,
+  FaPlus,
 } from "react-icons/fa";
 
 // ==========================================
@@ -46,6 +50,8 @@ import {
 import {
   getClaims,
   getClaimById,
+  updateClaim,
+  deleteClaim,
 } from "../services/claimService";
 
 // ==========================================
@@ -53,6 +59,18 @@ import {
 // ==========================================
 
 import { generateClaimPDF } from "../services/pdfService";
+
+// ==========================================
+// Allowed Categories
+// ==========================================
+
+const ALLOWED_CATEGORIES = [
+  "health",
+  "vehicle",
+  "property",
+  "travel",
+  "life",
+];
 
 // ==========================================
 // Insurance Icon
@@ -81,7 +99,7 @@ const getIcon = (type) => {
 };
 
 // ==========================================
-// Convert Backend Category
+// Format Type
 // ==========================================
 
 const formatType = (category) => {
@@ -195,7 +213,7 @@ const formatDate = (dateValue) => {
 // ==========================================
 
 const getCustomerName = (claim) => {
-  const data = claim.claimData || {};
+  const data = claim?.claimData || {};
 
   return (
     data.applicantName ||
@@ -206,6 +224,8 @@ const getCustomerName = (claim) => {
     data.policyHolder ||
     data.driverName ||
     data.nomineeName ||
+    data.customerName ||
+    data.insuredName ||
     "Unknown Customer"
   );
 };
@@ -216,7 +236,7 @@ const getCustomerName = (claim) => {
 
 const getConfidence = (claim) => {
   if (
-    typeof claim.aiConfidence === "number" &&
+    typeof claim?.aiConfidence === "number" &&
     !Number.isNaN(claim.aiConfidence)
   ) {
     if (claim.aiConfidence <= 1) {
@@ -225,19 +245,21 @@ const getConfidence = (claim) => {
       );
     }
 
-    return Math.round(
-      claim.aiConfidence
-    );
+    return Math.round(claim.aiConfidence);
   }
 
   return null;
 };
 
 // ==========================================
-// Normalize Backend Claim
+// Normalize Claim
 // ==========================================
 
 const normalizeClaim = (claim) => {
+  if (!claim) {
+    return null;
+  }
+
   const formattedDate = formatDate(
     claim.submittedAt ||
       claim.createdAt
@@ -285,12 +307,516 @@ const normalizeClaim = (claim) => {
 };
 
 // ==========================================
-// Submissions Component
+// Label Formatter
+// ==========================================
+
+const formatFieldLabel = (key) => {
+  if (!key) {
+    return "";
+  }
+
+  return String(key)
+    .replace(/([A-Z])/g, " $1")
+    .replace(/[_-]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\b\w/g, (char) =>
+      char.toUpperCase()
+    );
+};
+
+// ==========================================
+// Date Field Detection
+// ==========================================
+
+const isDateField = (key) => {
+  const value = String(key).toLowerCase();
+
+  return (
+    value.includes("date") ||
+    value.includes("dob") ||
+    value.includes("birth")
+  );
+};
+
+// ==========================================
+// Long Text Detection
+// ==========================================
+
+const isLongTextField = (key, value) => {
+  const lowerKey =
+    String(key).toLowerCase();
+
+  if (
+    lowerKey.includes("description") ||
+    lowerKey.includes("address") ||
+    lowerKey.includes("damage") ||
+    lowerKey.includes("reason") ||
+    lowerKey.includes("details") ||
+    lowerKey.includes("remarks") ||
+    lowerKey.includes("comment") ||
+    lowerKey.includes("incident")
+  ) {
+    return true;
+  }
+
+  return (
+    typeof value === "string" &&
+    value.length > 120
+  );
+};
+
+// ==========================================
+// Convert Value For Input
+// ==========================================
+
+const normalizeInputValue = (value) => {
+  if (
+    value === null ||
+    value === undefined
+  ) {
+    return "";
+  }
+
+  if (
+    typeof value === "object"
+  ) {
+    return JSON.stringify(
+      value
+    );
+  }
+
+  return String(value);
+};
+
+// ==========================================
+// Dynamic Form Component
+// ==========================================
+
+const DynamicClaimForm = ({
+  data,
+  onChange,
+  disabled,
+}) => {
+  const entries = Object.entries(
+    data || {}
+  );
+
+  if (entries.length === 0) {
+    return (
+      <div
+        style={{
+          padding: "30px",
+          textAlign: "center",
+          border: "1px dashed #cbd5e1",
+          borderRadius: "14px",
+          color: "#64748b",
+          background: "#f8fafc",
+        }}
+      >
+        <FaFileAlt
+          style={{
+            fontSize: "30px",
+            marginBottom: "10px",
+          }}
+        />
+
+        <h3
+          style={{
+            margin: "0 0 6px",
+            color: "#334155",
+          }}
+        >
+          No claim fields found
+        </h3>
+
+        <p
+          style={{
+            margin: 0,
+          }}
+        >
+          This claim does not contain
+          editable form fields.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns:
+          "repeat(auto-fit, minmax(280px, 1fr))",
+        gap: "18px",
+      }}
+    >
+      {entries.map(
+        ([key, value]) => (
+          <DynamicField
+            key={key}
+            fieldKey={key}
+            value={value}
+            onChange={onChange}
+            disabled={disabled}
+          />
+        )
+      )}
+    </div>
+  );
+};
+
+// ==========================================
+// Dynamic Field
+// ==========================================
+
+const DynamicField = ({
+  fieldKey,
+  value,
+  onChange,
+  disabled,
+}) => {
+  const label =
+    formatFieldLabel(fieldKey);
+
+  // ----------------------------------------
+  // Object
+  // ----------------------------------------
+
+  if (
+    value &&
+    typeof value === "object" &&
+    !Array.isArray(value)
+  ) {
+    return (
+      <div
+        style={{
+          gridColumn: "1 / -1",
+          padding: "18px",
+          border: "1px solid #e2e8f0",
+          borderRadius: "14px",
+          background: "#f8fafc",
+        }}
+      >
+        <div
+          style={{
+            fontWeight: 700,
+            color: "#0f172a",
+            marginBottom: "15px",
+            fontSize: "15px",
+          }}
+        >
+          {label}
+        </div>
+
+        <DynamicClaimForm
+          data={value}
+          onChange={(childKey, childValue) => {
+            onChange(
+              fieldKey,
+              {
+                ...value,
+                [childKey]: childValue,
+              }
+            );
+          }}
+          disabled={disabled}
+        />
+      </div>
+    );
+  }
+
+  // ----------------------------------------
+  // Array
+  // ----------------------------------------
+
+  if (Array.isArray(value)) {
+    return (
+      <div
+        style={{
+          gridColumn: "1 / -1",
+        }}
+      >
+        <label
+          style={{
+            display: "block",
+            marginBottom: "8px",
+            fontWeight: 700,
+            color: "#334155",
+          }}
+        >
+          {label}
+        </label>
+
+        <textarea
+          value={JSON.stringify(
+            value,
+            null,
+            2
+          )}
+          disabled={disabled}
+          onChange={(event) => {
+            try {
+              const parsed =
+                JSON.parse(
+                  event.target.value
+                );
+
+              if (
+                Array.isArray(parsed)
+              ) {
+                onChange(
+                  fieldKey,
+                  parsed
+                );
+              }
+            } catch {
+              // Keep current array when
+              // JSON is temporarily invalid.
+            }
+          }}
+          style={{
+            width: "100%",
+            minHeight: "110px",
+            padding: "12px",
+            borderRadius: "10px",
+            border:
+              "1px solid #cbd5e1",
+            fontFamily:
+              "Consolas, monospace",
+            background: "#ffffff",
+            color: "#0f172a",
+          }}
+        />
+      </div>
+    );
+  }
+
+  // ----------------------------------------
+  // Boolean
+  // ----------------------------------------
+
+  if (
+    typeof value === "boolean"
+  ) {
+    return (
+      <div
+        style={{
+          padding: "15px",
+          border:
+            "1px solid #e2e8f0",
+          borderRadius: "12px",
+          background: "#ffffff",
+        }}
+      >
+        <label
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "10px",
+            cursor: disabled
+              ? "default"
+              : "pointer",
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={value}
+            disabled={disabled}
+            onChange={(event) =>
+              onChange(
+                fieldKey,
+                event.target.checked
+              )
+            }
+            style={{
+              width: "18px",
+              height: "18px",
+            }}
+          />
+
+          <span
+            style={{
+              fontWeight: 700,
+              color: "#334155",
+            }}
+          >
+            {label}
+          </span>
+        </label>
+      </div>
+    );
+  }
+
+  // ----------------------------------------
+  // Number
+  // ----------------------------------------
+
+  if (
+    typeof value === "number"
+  ) {
+    return (
+      <div>
+        <label
+          style={{
+            display: "block",
+            marginBottom: "8px",
+            fontWeight: 700,
+            color: "#334155",
+          }}
+        >
+          {label}
+        </label>
+
+        <input
+          type="number"
+          value={value}
+          disabled={disabled}
+          onChange={(event) =>
+            onChange(
+              fieldKey,
+              event.target.value === ""
+                ? ""
+                : Number(
+                    event.target.value
+                  )
+            )
+          }
+          style={{
+            width: "100%",
+            boxSizing: "border-box",
+            padding:
+              "12px 14px",
+            borderRadius: "10px",
+            border:
+              "1px solid #cbd5e1",
+            background: "#ffffff",
+            color: "#0f172a",
+            fontSize: "14px",
+            outline: "none",
+          }}
+        />
+      </div>
+    );
+  }
+
+  // ----------------------------------------
+  // String
+  // ----------------------------------------
+
+  const inputValue =
+    normalizeInputValue(value);
+
+  const longText =
+    isLongTextField(
+      fieldKey,
+      value
+    );
+
+  const dateField =
+    isDateField(fieldKey);
+
+  if (longText) {
+    return (
+      <div
+        style={{
+          gridColumn:
+            "span 2",
+        }}
+      >
+        <label
+          style={{
+            display: "block",
+            marginBottom: "8px",
+            fontWeight: 700,
+            color: "#334155",
+          }}
+        >
+          {label}
+        </label>
+
+        <textarea
+          value={inputValue}
+          disabled={disabled}
+          onChange={(event) =>
+            onChange(
+              fieldKey,
+              event.target.value
+            )
+          }
+          rows={4}
+          style={{
+            width: "100%",
+            boxSizing: "border-box",
+            padding: "12px 14px",
+            borderRadius: "10px",
+            border:
+              "1px solid #cbd5e1",
+            background: "#ffffff",
+            color: "#0f172a",
+            fontSize: "14px",
+            resize: "vertical",
+            outline: "none",
+            fontFamily:
+              "inherit",
+          }}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <label
+        style={{
+          display: "block",
+          marginBottom: "8px",
+          fontWeight: 700,
+          color: "#334155",
+        }}
+      >
+        {label}
+      </label>
+
+      <input
+        type={
+          dateField
+            ? "date"
+            : "text"
+        }
+        value={inputValue}
+        disabled={disabled}
+        onChange={(event) =>
+          onChange(
+            fieldKey,
+            event.target.value
+          )
+        }
+        style={{
+          width: "100%",
+          boxSizing: "border-box",
+          padding:
+            "12px 14px",
+          borderRadius: "10px",
+          border:
+            "1px solid #cbd5e1",
+          background: "#ffffff",
+          color: "#0f172a",
+          fontSize: "14px",
+          outline: "none",
+        }}
+      />
+    </div>
+  );
+};
+
+// ==========================================
+// Main Component
 // ==========================================
 
 const Submissions = () => {
   // ========================================
-  // State
+  // Main State
   // ========================================
 
   const [
@@ -348,54 +874,104 @@ const Submissions = () => {
   ] = useState(false);
 
   // ========================================
-  // Load Claims
+  // Edit State
   // ========================================
 
-  const loadSubmissions = async () => {
-    try {
-      setLoading(true);
-      setError("");
+  const [
+    editingSubmission,
+    setEditingSubmission,
+  ] = useState(null);
 
-      const result =
-        await getClaims();
+  const [
+    editCategory,
+    setEditCategory,
+  ] = useState("");
 
-      console.log(
-        "📦 Claims received from backend:",
-        result
-      );
+  const [
+    editClaimData,
+    setEditClaimData,
+  ] = useState({});
 
-      const claims =
-        Array.isArray(result)
-          ? result
-          : result?.claims ||
-            result?.data ||
-            [];
+  const [
+    editError,
+    setEditError,
+  ] = useState("");
 
-      const normalizedClaims =
-        claims.map(
-          normalizeClaim
+  const [
+    savingEdit,
+    setSavingEdit,
+  ] = useState(false);
+
+  // ========================================
+  // Delete State
+  // ========================================
+
+  const [
+    deletingId,
+    setDeletingId,
+  ] = useState(null);
+
+  // ========================================
+  // Success
+  // ========================================
+
+  const [
+    successMessage,
+    setSuccessMessage,
+  ] = useState("");
+
+  // ========================================
+  // Load Submissions
+  // ========================================
+
+  const loadSubmissions =
+    async () => {
+      try {
+        setLoading(true);
+        setError("");
+
+        const result =
+          await getClaims();
+
+        console.log(
+          "📦 Claims:",
+          result
         );
 
-      setSubmissions(
-        normalizedClaims
-      );
-    } catch (err) {
-      console.error(
-        "❌ Failed to load submissions:",
-        err
-      );
+        const claims =
+          Array.isArray(result)
+            ? result
+            : result?.claims ||
+              result?.data ||
+              [];
 
-      setError(
-        err.message ||
-          "Unable to load submissions from backend."
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
+        const normalized =
+          claims
+            .map(normalizeClaim)
+            .filter(Boolean);
+
+        setSubmissions(
+          normalized
+        );
+      } catch (err) {
+        console.error(
+          "❌ Failed to load claims:",
+          err
+        );
+
+        setError(
+          err?.response?.data
+            ?.message ||
+            err?.message ||
+            "Unable to load submissions."
+        );
+      } finally {
+        setLoading(false);
+      }
+    };
 
   // ========================================
-  // Load When Page Opens
+  // Initial Load
   // ========================================
 
   useEffect(() => {
@@ -403,7 +979,7 @@ const Submissions = () => {
   }, []);
 
   // ========================================
-  // Search + Filters
+  // Filters
   // ========================================
 
   const filteredSubmissions =
@@ -411,18 +987,27 @@ const Submissions = () => {
       return submissions.filter(
         (submission) => {
           const searchValue =
-            search.toLowerCase();
+            search
+              .toLowerCase()
+              .trim();
 
           const matchesSearch =
+            !searchValue ||
             submission.form
               .toLowerCase()
-              .includes(searchValue) ||
+              .includes(
+                searchValue
+              ) ||
             submission.customer
               .toLowerCase()
-              .includes(searchValue) ||
+              .includes(
+                searchValue
+              ) ||
             submission.id
               .toLowerCase()
-              .includes(searchValue);
+              .includes(
+                searchValue
+              );
 
           const matchesStatus =
             statusFilter === "All" ||
@@ -481,15 +1066,38 @@ const Submissions = () => {
     ).length;
 
   // ========================================
-  // Generate PDF
+  // Success Message
+  // ========================================
+
+  const showSuccess =
+    (message) => {
+      setSuccessMessage(
+        message
+      );
+
+      window.setTimeout(
+        () => {
+          setSuccessMessage(
+            ""
+          );
+        },
+        3500
+      );
+    };
+
+  // ========================================
+  // PDF Generation
   // ========================================
 
   const createPDFForSubmission =
-    async (submission) => {
+    async (
+      submission
+    ) => {
       try {
-        setGeneratingPdf(true);
+        setGeneratingPdf(
+          true
+        );
 
-        // Get the most recent claim
         const result =
           await getClaimById(
             submission.databaseId
@@ -510,17 +1118,16 @@ const Submissions = () => {
           );
         }
 
-        // Revoke old object URL
         if (pdfUrl) {
           URL.revokeObjectURL(
             pdfUrl
           );
         }
 
-        // Generate PDF
         const generatedPDF =
           generateClaimPDF({
             claim,
+
             category:
               claim.category ||
               submission.type.toLowerCase(),
@@ -547,19 +1154,26 @@ const Submissions = () => {
             `${submission.id}.pdf`
         );
 
-        // Keep complete claim in selected submission
-        setSelectedSubmission({
-          ...normalizeClaim(
-            claim
-          ),
-          rawClaim:
-            claim,
-          pdfReady:
-            true,
-        });
+        setSelectedSubmission(
+          (previous) => ({
+            ...(previous ||
+              normalizeClaim(
+                claim
+              )),
+
+            rawClaim:
+              claim,
+
+            pdfReady: true,
+
+            loadingDetails:
+              false,
+
+            pdfError: "",
+          })
+        );
 
         return generatedPDF;
-
       } catch (err) {
         console.error(
           "❌ PDF generation failed:",
@@ -570,14 +1184,14 @@ const Submissions = () => {
           (previous) => ({
             ...(previous ||
               submission),
+
             pdfError:
-              err.message ||
+              err?.message ||
               "Unable to generate PDF.",
           })
         );
 
         throw err;
-
       } finally {
         setGeneratingPdf(
           false
@@ -590,7 +1204,9 @@ const Submissions = () => {
   // ========================================
 
   const handleViewSubmission =
-    async (submission) => {
+    async (
+      submission
+    ) => {
       try {
         setSelectedSubmission({
           ...submission,
@@ -598,18 +1214,15 @@ const Submissions = () => {
           pdfError: "",
         });
 
-        // Remove old PDF
         if (pdfUrl) {
           URL.revokeObjectURL(
             pdfUrl
           );
-
           setPdfUrl("");
         }
 
         setPdfFileName("");
 
-        // Fetch full claim
         const result =
           await getClaimById(
             submission.databaseId
@@ -627,24 +1240,37 @@ const Submissions = () => {
 
         setSelectedSubmission({
           ...normalized,
+
           rawClaim:
             claim,
+
           loadingDetails:
             false,
-          pdfReady: false,
+
+          pdfReady:
+            false,
+
           pdfError: "",
         });
 
-        // Automatically generate PDF
-        await createPDFForSubmission({
-          ...normalized,
-          rawClaim:
-            claim,
-        });
-
+        try {
+          await createPDFForSubmission(
+            {
+              ...normalized,
+              rawClaim: claim,
+            }
+          );
+        } catch (
+          pdfError
+        ) {
+          console.warn(
+            "PDF generation failed:",
+            pdfError
+          );
+        }
       } catch (err) {
         console.error(
-          "❌ Failed to fetch claim details:",
+          "❌ Failed to fetch claim:",
           err
         );
 
@@ -652,12 +1278,415 @@ const Submissions = () => {
           (previous) => ({
             ...(previous || {}),
             ...submission,
+
             loadingDetails:
               false,
+
             pdfError:
-              err.message ||
+              err?.response?.data
+                ?.message ||
+              err?.message ||
               "Unable to load claim details.",
           })
+        );
+      }
+    };
+
+  // ========================================
+  // Open Edit
+  // ========================================
+
+  const handleOpenEdit =
+    async (
+      submission
+    ) => {
+      try {
+        setEditError("");
+
+        let claim =
+          submission.rawClaim;
+
+        if (
+          !claim ||
+          !claim._id
+        ) {
+          const result =
+            await getClaimById(
+              submission.databaseId
+            );
+
+          claim =
+            result?.claim ||
+            result?.data ||
+            result;
+        }
+
+        if (!claim) {
+          throw new Error(
+            "Claim could not be found."
+          );
+        }
+
+        if (
+          claim.status ===
+            "approved" ||
+          claim.status ===
+            "rejected"
+        ) {
+          setEditError(
+            "Approved or rejected claims cannot be edited."
+          );
+
+          return;
+        }
+
+        setEditingSubmission(
+          claim
+        );
+
+        setEditCategory(
+          claim.category ||
+            "vehicle"
+        );
+
+        // IMPORTANT:
+        // Store actual object instead
+        // of JSON string.
+        setEditClaimData(
+          claim.claimData &&
+            typeof claim.claimData ===
+              "object"
+            ? {
+                ...claim.claimData,
+              }
+            : {}
+        );
+
+        // Close view modal
+        setSelectedSubmission(
+          null
+        );
+
+        if (pdfUrl) {
+          URL.revokeObjectURL(
+            pdfUrl
+          );
+
+          setPdfUrl("");
+          setPdfFileName("");
+        }
+      } catch (err) {
+        console.error(
+          "❌ Unable to open edit:",
+          err
+        );
+
+        setEditError(
+          err?.response?.data
+            ?.message ||
+            err?.message ||
+            "Unable to open claim for editing."
+        );
+      }
+    };
+
+  // ========================================
+  // Edit Field
+  // ========================================
+
+  const handleEditField =
+    (
+      key,
+      value
+    ) => {
+      setEditClaimData(
+        (previous) => ({
+          ...previous,
+          [key]: value,
+        })
+      );
+    };
+
+  // ========================================
+  // Add New Field
+  // ========================================
+
+  const handleAddField =
+    () => {
+      let fieldName =
+        window.prompt(
+          "Enter the new field name:"
+        );
+
+      if (!fieldName) {
+        return;
+      }
+
+      fieldName =
+        fieldName.trim();
+
+      if (!fieldName) {
+        return;
+      }
+
+      if (
+        Object.prototype.hasOwnProperty.call(
+          editClaimData,
+          fieldName
+        )
+      ) {
+        window.alert(
+          "This field already exists."
+        );
+
+        return;
+      }
+
+      setEditClaimData(
+        (previous) => ({
+          ...previous,
+          [fieldName]: "",
+        })
+      );
+    };
+
+  // ========================================
+  // Remove Field
+  // ========================================
+
+  const handleRemoveField =
+    (fieldKey) => {
+      const confirmed =
+        window.confirm(
+          `Remove "${formatFieldLabel(
+            fieldKey
+          )}" from this claim?`
+        );
+
+      if (!confirmed) {
+        return;
+      }
+
+      setEditClaimData(
+        (previous) => {
+          const copy = {
+            ...previous,
+          };
+
+          delete copy[
+            fieldKey
+          ];
+
+          return copy;
+        }
+      );
+    };
+
+  // ========================================
+  // Close Edit
+  // ========================================
+
+  const handleCloseEdit =
+    () => {
+      if (savingEdit) {
+        return;
+      }
+
+      setEditingSubmission(
+        null
+      );
+
+      setEditCategory("");
+
+      setEditClaimData({});
+
+      setEditError("");
+    };
+
+  // ========================================
+  // Save Edit
+  // ========================================
+
+  const handleSaveEdit =
+    async () => {
+      try {
+        setEditError("");
+
+        if (
+          !editingSubmission?._id
+        ) {
+          throw new Error(
+            "Claim ID is missing."
+          );
+        }
+
+        if (
+          !ALLOWED_CATEGORIES.includes(
+            editCategory
+          )
+        ) {
+          throw new Error(
+            "Please select a valid insurance category."
+          );
+        }
+
+        setSavingEdit(
+          true
+        );
+
+        const result =
+          await updateClaim(
+            editingSubmission._id,
+            {
+              category:
+                editCategory,
+
+              claimData:
+                editClaimData,
+            }
+          );
+
+        console.log(
+          "✅ Updated claim:",
+          result
+        );
+
+        const updatedClaim =
+          result?.claim ||
+          result?.data ||
+          result;
+
+        if (
+          updatedClaim &&
+          updatedClaim._id
+        ) {
+          const normalized =
+            normalizeClaim(
+              updatedClaim
+            );
+
+          setSubmissions(
+            (previous) =>
+              previous.map(
+                (item) =>
+                  item.databaseId ===
+                  updatedClaim._id
+                    ? normalized
+                    : item
+              )
+          );
+        }
+
+        setEditingSubmission(
+          null
+        );
+
+        setEditCategory("");
+
+        setEditClaimData({});
+
+        showSuccess(
+          "Claim updated successfully."
+        );
+
+        // Refresh from backend
+        await loadSubmissions();
+      } catch (err) {
+        console.error(
+          "❌ Failed to update:",
+          err
+        );
+
+        setEditError(
+          err?.response?.data
+            ?.message ||
+            err?.response?.data
+              ?.error ||
+            err?.message ||
+            "Unable to update claim."
+        );
+      } finally {
+        setSavingEdit(
+          false
+        );
+      }
+    };
+
+  // ========================================
+  // Delete Claim
+  // ========================================
+
+  const handleDeleteClaim =
+    async (
+      submission
+    ) => {
+      try {
+        if (
+          !submission?.databaseId
+        ) {
+          throw new Error(
+            "Claim ID is missing."
+          );
+        }
+
+        const confirmed =
+          window.confirm(
+            `Are you sure you want to delete claim "${submission.id}"?\n\nThis will permanently remove the claim from the database.`
+          );
+
+        if (!confirmed) {
+          return;
+        }
+
+        setDeletingId(
+          submission.databaseId
+        );
+
+        console.log(
+          "🗑️ Deleting:",
+          submission.databaseId
+        );
+
+        await deleteClaim(
+          submission.databaseId
+        );
+
+        setSubmissions(
+          (previous) =>
+            previous.filter(
+              (item) =>
+                item.databaseId !==
+                submission.databaseId
+            )
+        );
+
+        if (
+          selectedSubmission?.databaseId ===
+          submission.databaseId
+        ) {
+          handleCloseModal();
+        }
+
+        showSuccess(
+          "Claim deleted successfully."
+        );
+      } catch (err) {
+        console.error(
+          "❌ Delete failed:",
+          err
+        );
+
+        window.alert(
+          err?.response?.data
+            ?.message ||
+            err?.response?.data
+              ?.error ||
+            err?.message ||
+            "Unable to delete claim."
+        );
+      } finally {
+        setDeletingId(
+          null
         );
       }
     };
@@ -674,9 +1703,11 @@ const Submissions = () => {
 
         let fileName =
           pdfFileName ||
-          `${selectedSubmission?.id || "forma-ai-claim"}.pdf`;
+          `${
+            selectedSubmission?.id ||
+            "forma-ai-claim"
+          }.pdf`;
 
-        // Generate if not available
         if (!downloadUrl) {
           const generated =
             await createPDFForSubmission(
@@ -717,20 +1748,15 @@ const Submissions = () => {
         document.body.removeChild(
           link
         );
-
       } catch (err) {
         console.error(
           "❌ PDF download failed:",
           err
         );
 
-        setSelectedSubmission(
-          (previous) => ({
-            ...(previous || {}),
-            pdfError:
-              err.message ||
-              "Unable to download PDF.",
-          })
+        window.alert(
+          err?.message ||
+            "Unable to download PDF."
         );
       }
     };
@@ -766,7 +1792,6 @@ const Submissions = () => {
           "_blank",
           "noopener,noreferrer"
         );
-
       } catch (err) {
         console.error(
           "❌ Failed to open PDF:",
@@ -776,7 +1801,7 @@ const Submissions = () => {
     };
 
   // ========================================
-  // Close Modal
+  // Close View Modal
   // ========================================
 
   const handleCloseModal =
@@ -789,12 +1814,15 @@ const Submissions = () => {
         URL.revokeObjectURL(
           pdfUrl
         );
-
-        setPdfUrl("");
       }
 
+      setPdfUrl("");
+
       setPdfFileName("");
-      setGeneratingPdf(false);
+
+      setGeneratingPdf(
+        false
+      );
     };
 
   // ========================================
@@ -832,6 +1860,7 @@ const Submissions = () => {
 
           <div>
             <h2>Forma AI</h2>
+
             <span>
               Insurance Intelligence
             </span>
@@ -848,9 +1877,7 @@ const Submissions = () => {
           <li>
             <NavLink
               to="/dashboard"
-              className={({
-                isActive,
-              }) =>
+              className={({ isActive }) =>
                 isActive
                   ? "submission-link active"
                   : "submission-link"
@@ -866,9 +1893,7 @@ const Submissions = () => {
           <li>
             <NavLink
               to="/ai-parser"
-              className={({
-                isActive,
-              }) =>
+              className={({ isActive }) =>
                 isActive
                   ? "submission-link active"
                   : "submission-link"
@@ -884,9 +1909,7 @@ const Submissions = () => {
           <li>
             <NavLink
               to="/dynamic-forms"
-              className={({
-                isActive,
-              }) =>
+              className={({ isActive }) =>
                 isActive
                   ? "submission-link active"
                   : "submission-link"
@@ -902,9 +1925,7 @@ const Submissions = () => {
           <li>
             <NavLink
               to="/analytics"
-              className={({
-                isActive,
-              }) =>
+              className={({ isActive }) =>
                 isActive
                   ? "submission-link active"
                   : "submission-link"
@@ -920,9 +1941,7 @@ const Submissions = () => {
           <li>
             <NavLink
               to="/submissions"
-              className={({
-                isActive,
-              }) =>
+              className={({ isActive }) =>
                 isActive
                   ? "submission-link active"
                   : "submission-link"
@@ -995,7 +2014,7 @@ const Submissions = () => {
             </span>
           </div>
 
-          <div className="online-dot"></div>
+          <div className="online-dot" />
 
         </div>
 
@@ -1050,7 +2069,10 @@ const Submissions = () => {
 
             </div>
 
-            <button className="notification-button">
+            <button
+              type="button"
+              className="notification-button"
+            >
               <FaBell />
               <span>3</span>
             </button>
@@ -1075,8 +2097,35 @@ const Submissions = () => {
 
         </header>
 
+        {/* SUCCESS */}
+
+        {successMessage && (
+          <div
+            style={{
+              marginBottom: "20px",
+              padding:
+                "14px 18px",
+              borderRadius: "12px",
+              background:
+                "#ecfdf3",
+              border:
+                "1px solid #a7f3d0",
+              color:
+                "#047857",
+              display: "flex",
+              alignItems:
+                "center",
+              gap: "10px",
+              fontWeight: 600,
+            }}
+          >
+            <FaCheckCircle />
+            {successMessage}
+          </div>
+        )}
+
         {/* ====================================
-            TOP STATS
+            STATS
         ==================================== */}
 
         <section className="submission-stats">
@@ -1184,7 +2233,7 @@ const Submissions = () => {
         </section>
 
         {/* ====================================
-            SUBMISSIONS CARD
+            SUBMISSIONS
         ==================================== */}
 
         <section className="submissions-card">
@@ -1203,9 +2252,8 @@ const Submissions = () => {
               </p>
             </div>
 
-            {/* Refresh */}
-
             <button
+              type="button"
               className="export-button"
               onClick={
                 loadSubmissions
@@ -1213,7 +2261,10 @@ const Submissions = () => {
               disabled={loading}
             >
               <FaArrowRight />
-              Refresh
+
+              {loading
+                ? "Refreshing..."
+                : "Refresh"}
             </button>
 
           </div>
@@ -1221,7 +2272,6 @@ const Submissions = () => {
           {/* ERROR */}
 
           {error && (
-
             <div className="empty-state">
 
               <FaTimesCircle />
@@ -1235,6 +2285,7 @@ const Submissions = () => {
               </p>
 
               <button
+                type="button"
                 className="view-button"
                 onClick={
                   loadSubmissions
@@ -1246,10 +2297,7 @@ const Submissions = () => {
             </div>
           )}
 
-          {/* FILTER BAR */}
-
           {!error && (
-
             <div className="filter-bar">
 
               <div className="filter-label">
@@ -1267,7 +2315,6 @@ const Submissions = () => {
                   )
                 }
               >
-
                 <option value="All">
                   All Status
                 </option>
@@ -1291,7 +2338,6 @@ const Submissions = () => {
                 <option value="Rejected">
                   Rejected
                 </option>
-
               </select>
 
               <select
@@ -1304,7 +2350,6 @@ const Submissions = () => {
                   )
                 }
               >
-
                 <option value="All">
                   All Types
                 </option>
@@ -1328,7 +2373,6 @@ const Submissions = () => {
                 <option value="Life">
                   Life
                 </option>
-
               </select>
 
               <div className="results-count">
@@ -1345,7 +2389,6 @@ const Submissions = () => {
 
           {loading &&
             !error && (
-
               <div className="empty-state">
 
                 <FaSpinner className="fa-spin" />
@@ -1374,9 +2417,7 @@ const Submissions = () => {
                 <table className="submissions-table">
 
                   <thead>
-
                     <tr>
-
                       <th>
                         Submission
                       </th>
@@ -1404,201 +2445,265 @@ const Submissions = () => {
                       <th>
                         Action
                       </th>
-
                     </tr>
-
                   </thead>
 
                   <tbody>
 
                     {filteredSubmissions.map(
-                      (submission) => (
+                      (
+                        submission
+                      ) => {
 
-                        <tr
-                          key={
-                            submission.databaseId
-                          }
-                        >
+                        const canEdit =
+                          submission.rawClaim
+                            ?.status !==
+                            "approved" &&
+                          submission.rawClaim
+                            ?.status !==
+                            "rejected";
 
-                          {/* Submission */}
+                        return (
+                          <tr
+                            key={
+                              submission.databaseId
+                            }
+                          >
 
-                          <td>
+                            <td>
 
-                            <div className="submission-name">
+                              <div className="submission-name">
 
-                              <div
-                                className={`form-type-icon ${submission.type.toLowerCase()}`}
-                              >
-                                {getIcon(
-                                  submission.type
-                                )}
+                                <div
+                                  className={`form-type-icon ${submission.type.toLowerCase()}`}
+                                >
+                                  {getIcon(
+                                    submission.type
+                                  )}
+                                </div>
+
+                                <div>
+
+                                  <strong>
+                                    {
+                                      submission.form
+                                    }
+                                  </strong>
+
+                                  <span>
+                                    {
+                                      submission.id
+                                    }
+                                  </span>
+
+                                </div>
+
                               </div>
 
-                              <div>
+                            </td>
+
+                            <td>
+
+                              <span className="customer-name">
+                                {
+                                  submission.customer
+                                }
+                              </span>
+
+                            </td>
+
+                            <td>
+
+                              <span className="type-badge">
+                                {
+                                  submission.type
+                                }
+                              </span>
+
+                            </td>
+
+                            <td>
+
+                              <span
+                                className={`status-badge ${submission.status
+                                  .toLowerCase()
+                                  .replace(
+                                    /\s+/g,
+                                    "-"
+                                  )}`}
+                              >
+
+                                {submission.status ===
+                                  "Approved" && (
+                                  <FaCheckCircle />
+                                )}
+
+                                {submission.status ===
+                                  "Rejected" && (
+                                  <FaTimesCircle />
+                                )}
+
+                                {(submission.status ===
+                                  "Submitted" ||
+                                  submission.status ===
+                                    "Under Review" ||
+                                  submission.status ===
+                                    "Draft") && (
+                                  <FaClock />
+                                )}
+
+                                {
+                                  submission.status
+                                }
+
+                              </span>
+
+                            </td>
+
+                            <td>
+
+                              {submission.confidence !==
+                              null ? (
+
+                                <div className="confidence-wrapper">
+
+                                  <div className="confidence-bar">
+
+                                    <div
+                                      className="confidence-fill"
+                                      style={{
+                                        width: `${submission.confidence}%`,
+                                      }}
+                                    />
+
+                                  </div>
+
+                                  <strong>
+                                    {
+                                      submission.confidence
+                                    }
+                                    %
+                                  </strong>
+
+                                </div>
+
+                              ) : (
+                                <span>
+                                  Not analyzed
+                                </span>
+                              )}
+
+                            </td>
+
+                            <td>
+
+                              <div className="date-cell">
 
                                 <strong>
                                   {
-                                    submission.form
+                                    submission.date
                                   }
                                 </strong>
 
                                 <span>
                                   {
-                                    submission.id
+                                    submission.time
                                   }
                                 </span>
 
                               </div>
 
-                            </div>
+                            </td>
 
-                          </td>
+                            {/* ACTIONS */}
 
-                          {/* Customer */}
+                            <td>
 
-                          <td>
+                              <div
+                                style={{
+                                  display:
+                                    "flex",
+                                  alignItems:
+                                    "center",
+                                  gap:
+                                    "7px",
+                                  flexWrap:
+                                    "wrap",
+                                }}
+                              >
 
-                            <span className="customer-name">
-                              {
-                                submission.customer
-                              }
-                            </span>
+                                {/* VIEW */}
 
-                          </td>
-
-                          {/* Type */}
-
-                          <td>
-
-                            <span className="type-badge">
-                              {
-                                submission.type
-                              }
-                            </span>
-
-                          </td>
-
-                          {/* Status */}
-
-                          <td>
-
-                            <span
-                              className={`status-badge ${submission.status
-                                .toLowerCase()
-                                .replace(
-                                  /\s+/g,
-                                  "-"
-                                )}`}
-                            >
-
-                              {submission.status ===
-                                "Approved" && (
-                                <FaCheckCircle />
-                              )}
-
-                              {submission.status ===
-                                "Rejected" && (
-                                <FaTimesCircle />
-                              )}
-
-                              {(submission.status ===
-                                "Submitted" ||
-                                submission.status ===
-                                  "Under Review" ||
-                                submission.status ===
-                                  "Draft") && (
-                                <FaClock />
-                              )}
-
-                              {
-                                submission.status
-                              }
-
-                            </span>
-
-                          </td>
-
-                          {/* Confidence */}
-
-                          <td>
-
-                            {submission.confidence !==
-                            null ? (
-
-                              <div className="confidence-wrapper">
-
-                                <div className="confidence-bar">
-
-                                  <div
-                                    className="confidence-fill"
-                                    style={{
-                                      width: `${submission.confidence}%`,
-                                    }}
-                                  />
-
-                                </div>
-
-                                <strong>
-                                  {
-                                    submission.confidence
+                                <button
+                                  type="button"
+                                  className="view-button"
+                                  onClick={() =>
+                                    handleViewSubmission(
+                                      submission
+                                    )
                                   }
-                                  %
-                                </strong>
+                                  title="View claim"
+                                >
+                                  <FaEye />
+                                  View
+                                </button>
+
+                                {/* EDIT */}
+
+                                {canEdit && (
+                                  <button
+                                    type="button"
+                                    className="view-button"
+                                    onClick={() =>
+                                      handleOpenEdit(
+                                        submission
+                                      )
+                                    }
+                                    title="Edit claim"
+                                  >
+                                    <FaEdit />
+                                    Edit
+                                  </button>
+                                )}
+
+                                {/* DELETE - ALL CLAIMS */}
+
+                                <button
+                                  type="button"
+                                  className="view-button"
+                                  onClick={() =>
+                                    handleDeleteClaim(
+                                      submission
+                                    )
+                                  }
+                                  disabled={
+                                    deletingId ===
+                                    submission.databaseId
+                                  }
+                                  title="Delete claim"
+                                >
+
+                                  {deletingId ===
+                                  submission.databaseId ? (
+                                    <FaSpinner className="fa-spin" />
+                                  ) : (
+                                    <FaTrash />
+                                  )}
+
+                                  {deletingId ===
+                                  submission.databaseId
+                                    ? "Deleting..."
+                                    : "Delete"}
+
+                                </button>
 
                               </div>
 
-                            ) : (
+                            </td>
 
-                              <span>
-                                Not analyzed
-                              </span>
-
-                            )}
-
-                          </td>
-
-                          {/* Date */}
-
-                          <td>
-
-                            <div className="date-cell">
-
-                              <strong>
-                                {
-                                  submission.date
-                                }
-                              </strong>
-
-                              <span>
-                                {
-                                  submission.time
-                                }
-                              </span>
-
-                            </div>
-
-                          </td>
-
-                          {/* Action */}
-
-                          <td>
-
-                            <button
-                              className="view-button"
-                              onClick={() =>
-                                handleViewSubmission(
-                                  submission
-                                )
-                              }
-                            >
-                              <FaEye />
-                              View
-                            </button>
-
-                          </td>
-
-                        </tr>
-                      )
+                          </tr>
+                        );
+                      }
                     )}
 
                   </tbody>
@@ -1655,11 +2760,12 @@ const Submissions = () => {
               </div>
             )}
 
-          {/* PAGINATION INFO */}
+          {/* PAGINATION */}
 
           {!loading &&
             !error &&
-            submissions.length > 0 && (
+            submissions.length >
+              0 && (
 
               <div className="pagination">
 
@@ -1677,15 +2783,24 @@ const Submissions = () => {
 
                 <div className="pagination-buttons">
 
-                  <button disabled>
+                  <button
+                    type="button"
+                    disabled
+                  >
                     Previous
                   </button>
 
-                  <button className="page-active">
+                  <button
+                    type="button"
+                    className="page-active"
+                  >
                     1
                   </button>
 
-                  <button disabled>
+                  <button
+                    type="button"
+                    disabled
+                  >
                     Next
                   </button>
 
@@ -1699,7 +2814,7 @@ const Submissions = () => {
       </main>
 
       {/* ======================================
-          VIEW SUBMISSION MODAL
+          VIEW MODAL
       ====================================== */}
 
       {selectedSubmission && (
@@ -1718,9 +2833,8 @@ const Submissions = () => {
             }
           >
 
-            {/* CLOSE */}
-
             <button
+              type="button"
               className="modal-close"
               onClick={
                 handleCloseModal
@@ -1728,8 +2842,6 @@ const Submissions = () => {
             >
               <FaTimes />
             </button>
-
-            {/* MODAL HEADER */}
 
             <div className="modal-top">
 
@@ -1755,8 +2867,6 @@ const Submissions = () => {
 
             </div>
 
-            {/* STATUS */}
-
             <div className="modal-status">
 
               <span
@@ -1774,7 +2884,6 @@ const Submissions = () => {
 
               <span className="modal-confidence">
                 AI Confidence:{" "}
-
                 <strong>
                   {
                     selectedSubmission.confidence !==
@@ -1787,12 +2896,9 @@ const Submissions = () => {
 
             </div>
 
-            {/* DETAILS */}
-
             <div className="modal-details">
 
               <div>
-
                 <span>
                   Form
                 </span>
@@ -1802,11 +2908,9 @@ const Submissions = () => {
                     selectedSubmission.form
                   }
                 </strong>
-
               </div>
 
               <div>
-
                 <span>
                   Customer
                 </span>
@@ -1816,11 +2920,9 @@ const Submissions = () => {
                     selectedSubmission.customer
                   }
                 </strong>
-
               </div>
 
               <div>
-
                 <span>
                   Insurance Type
                 </span>
@@ -1830,11 +2932,9 @@ const Submissions = () => {
                     selectedSubmission.type
                   }
                 </strong>
-
               </div>
 
               <div>
-
                 <span>
                   Submitted
                 </span>
@@ -1848,12 +2948,9 @@ const Submissions = () => {
                     selectedSubmission.time
                   }
                 </strong>
-
               </div>
 
             </div>
-
-            {/* LOADING DETAILS */}
 
             {selectedSubmission.loadingDetails && (
 
@@ -1876,8 +2973,6 @@ const Submissions = () => {
 
               </div>
             )}
-
-            {/* PDF ERROR */}
 
             {selectedSubmission.pdfError && (
 
@@ -1902,8 +2997,6 @@ const Submissions = () => {
               </div>
             )}
 
-            {/* PDF GENERATING */}
-
             {generatingPdf &&
               !selectedSubmission.loadingDetails && (
 
@@ -1926,8 +3019,6 @@ const Submissions = () => {
 
                 </div>
               )}
-
-            {/* PDF PREVIEW */}
 
             {!selectedSubmission.loadingDetails &&
               !generatingPdf &&
@@ -1972,9 +3063,7 @@ const Submissions = () => {
                   <div className="submissionPdfViewer">
 
                     <iframe
-                      src={
-                        pdfUrl
-                      }
+                      src={pdfUrl}
                       title="Forma AI Claim PDF"
                     />
 
@@ -1982,8 +3071,6 @@ const Submissions = () => {
 
                 </div>
               )}
-
-            {/* AI RECORD */}
 
             {!selectedSubmission.loadingDetails &&
               !generatingPdf &&
@@ -2014,9 +3101,75 @@ const Submissions = () => {
 
             {/* MODAL ACTIONS */}
 
-            <div className="modal-actions">
+            <div
+              className="modal-actions"
+              style={{
+                display:
+                  "flex",
+                flexWrap:
+                  "wrap",
+                gap:
+                  "10px",
+              }}
+            >
+
+              {/* EDIT */}
+
+              {selectedSubmission.rawClaim
+                ?.status !==
+                "approved" &&
+                selectedSubmission.rawClaim
+                  ?.status !==
+                  "rejected" && (
+
+                  <button
+                    type="button"
+                    className="secondary-modal-button"
+                    onClick={() =>
+                      handleOpenEdit(
+                        selectedSubmission
+                      )
+                    }
+                  >
+                    <FaEdit />
+                    Edit Claim
+                  </button>
+                )}
+
+              {/* DELETE ALL */}
 
               <button
+                type="button"
+                className="secondary-modal-button"
+                onClick={() =>
+                  handleDeleteClaim(
+                    selectedSubmission
+                  )
+                }
+                disabled={
+                  deletingId ===
+                  selectedSubmission.databaseId
+                }
+              >
+
+                {deletingId ===
+                selectedSubmission.databaseId ? (
+                  <FaSpinner className="fa-spin" />
+                ) : (
+                  <FaTrash />
+                )}
+
+                {deletingId ===
+                selectedSubmission.databaseId
+                  ? "Deleting..."
+                  : "Delete Claim"}
+
+              </button>
+
+              {/* DOWNLOAD */}
+
+              <button
+                type="button"
                 className="secondary-modal-button"
                 onClick={
                   handleDownloadPDF
@@ -2026,12 +3179,16 @@ const Submissions = () => {
                 }
               >
                 <FaDownload />
+
                 {generatingPdf
                   ? "Generating..."
                   : "Download PDF"}
               </button>
 
+              {/* OPEN PDF */}
+
               <button
+                type="button"
                 className="primary-modal-button"
                 onClick={
                   handleOpenPDF
@@ -2043,6 +3200,523 @@ const Submissions = () => {
               >
                 <FaFilePdf />
                 Open PDF
+              </button>
+
+            </div>
+
+          </div>
+
+        </div>
+      )}
+
+      {/* ======================================
+          DYNAMIC FORM EDIT MODAL
+      ====================================== */}
+
+      {editingSubmission && (
+
+        <div
+          className="modal-overlay"
+          onClick={
+            handleCloseEdit
+          }
+        >
+
+          <div
+            className="submission-modal"
+            onClick={(e) =>
+              e.stopPropagation()
+            }
+            style={{
+              maxWidth:
+                "1050px",
+              width:
+                "calc(100% - 30px)",
+              maxHeight:
+                "90vh",
+              overflowY:
+                "auto",
+            }}
+          >
+
+            {/* CLOSE */}
+
+            <button
+              type="button"
+              className="modal-close"
+              onClick={
+                handleCloseEdit
+              }
+              disabled={
+                savingEdit
+              }
+            >
+              <FaTimes />
+            </button>
+
+            {/* HEADER */}
+
+            <div className="modal-top">
+
+              <div className="modal-icon">
+                <FaEdit />
+              </div>
+
+              <div>
+
+                <span>
+                  Edit Insurance Claim
+                </span>
+
+                <h2>
+                  {
+                    editingSubmission.claimNumber ||
+                    editingSubmission._id
+                  }
+                </h2>
+
+              </div>
+
+            </div>
+
+            {/* INFORMATION */}
+
+            <div
+              className="modal-ai-box"
+              style={{
+                marginBottom:
+                  "20px",
+              }}
+            >
+
+              <FaEdit />
+
+              <div>
+
+                <strong>
+                  Dynamic Claim Form
+                </strong>
+
+                <p>
+                  Edit the claim using
+                  the same structured
+                  form-style interface.
+                  Changes will be saved
+                  directly to MongoDB.
+                </p>
+
+              </div>
+
+            </div>
+
+            {/* ERROR */}
+
+            {editError && (
+
+              <div
+                className="modal-ai-box"
+                style={{
+                  marginBottom:
+                    "20px",
+                }}
+              >
+
+                <FaTimesCircle />
+
+                <div>
+
+                  <strong>
+                    Update Failed
+                  </strong>
+
+                  <p>
+                    {editError}
+                  </p>
+
+                </div>
+
+              </div>
+            )}
+
+            {/* CATEGORY */}
+
+            <div
+              style={{
+                marginBottom:
+                  "24px",
+              }}
+            >
+
+              <label
+                htmlFor="edit-category"
+                style={{
+                  display:
+                    "block",
+                  marginBottom:
+                    "8px",
+                  fontWeight:
+                    "700",
+                  color:
+                    "#334155",
+                }}
+              >
+                Insurance Category
+              </label>
+
+              <select
+                id="edit-category"
+                value={
+                  editCategory
+                }
+                onChange={(e) =>
+                  setEditCategory(
+                    e.target.value
+                  )
+                }
+                disabled={
+                  savingEdit
+                }
+                style={{
+                  width:
+                    "100%",
+                  padding:
+                    "13px 15px",
+                  borderRadius:
+                    "10px",
+                  border:
+                    "1px solid #cbd5e1",
+                  background:
+                    "#ffffff",
+                  color:
+                    "#0f172a",
+                  fontSize:
+                    "15px",
+                }}
+              >
+
+                <option value="">
+                  Select category
+                </option>
+
+                <option value="health">
+                  Health Insurance
+                </option>
+
+                <option value="vehicle">
+                  Vehicle Insurance
+                </option>
+
+                <option value="property">
+                  Property Insurance
+                </option>
+
+                <option value="travel">
+                  Travel Insurance
+                </option>
+
+                <option value="life">
+                  Life Insurance
+                </option>
+
+              </select>
+
+            </div>
+
+            {/* FORM HEADER */}
+
+            <div
+              style={{
+                display:
+                  "flex",
+                alignItems:
+                  "center",
+                justifyContent:
+                  "space-between",
+                gap:
+                  "15px",
+                marginBottom:
+                  "15px",
+              }}
+            >
+
+              <div>
+
+                <h3
+                  style={{
+                    margin:
+                      "0 0 5px",
+                    color:
+                      "#0f172a",
+                  }}
+                >
+                  Claim Information
+                </h3>
+
+                <p
+                  style={{
+                    margin: 0,
+                    color:
+                      "#64748b",
+                    fontSize:
+                      "14px",
+                  }}
+                >
+                  Update the values
+                  below without
+                  editing raw JSON.
+                </p>
+
+              </div>
+
+              <button
+                type="button"
+                onClick={
+                  handleAddField
+                }
+                disabled={
+                  savingEdit
+                }
+                style={{
+                  display:
+                    "flex",
+                  alignItems:
+                    "center",
+                  gap:
+                    "7px",
+                  padding:
+                    "10px 14px",
+                  borderRadius:
+                    "9px",
+                  border:
+                    "1px solid #cbd5e1",
+                  background:
+                    "#ffffff",
+                  cursor:
+                    "pointer",
+                  fontWeight:
+                    "700",
+                  color:
+                    "#334155",
+                }}
+              >
+                <FaPlus />
+                Add Field
+              </button>
+
+            </div>
+
+            {/* DYNAMIC FORM */}
+
+            <div
+              style={{
+                padding:
+                  "20px",
+                border:
+                  "1px solid #e2e8f0",
+                borderRadius:
+                  "16px",
+                background:
+                  "#f8fafc",
+                marginBottom:
+                  "25px",
+              }}
+            >
+
+              <DynamicClaimForm
+                data={
+                  editClaimData
+                }
+                onChange={
+                  handleEditField
+                }
+                disabled={
+                  savingEdit
+                }
+              />
+
+            </div>
+
+            {/* FIELD REMOVE INFORMATION */}
+
+            {Object.keys(
+              editClaimData || {}
+            ).length > 0 && (
+
+              <div
+                style={{
+                  marginBottom:
+                    "20px",
+                  padding:
+                    "12px 15px",
+                  borderRadius:
+                    "10px",
+                  background:
+                    "#f1f5f9",
+                  color:
+                    "#64748b",
+                  fontSize:
+                    "13px",
+                }}
+              >
+                <FaExclamationTriangle
+                  style={{
+                    marginRight:
+                      "7px",
+                  }}
+                />
+
+                To remove a field,
+                use the field manager
+                below.
+              </div>
+            )}
+
+            {/* FIELD MANAGER */}
+
+            <div
+              style={{
+                marginBottom:
+                  "25px",
+              }}
+            >
+
+              <h4
+                style={{
+                  margin:
+                    "0 0 12px",
+                  color:
+                    "#334155",
+                }}
+              >
+                Field Manager
+              </h4>
+
+              <div
+                style={{
+                  display:
+                    "flex",
+                  flexWrap:
+                    "wrap",
+                  gap:
+                    "8px",
+                }}
+              >
+
+                {Object.keys(
+                  editClaimData || {}
+                ).map(
+                  (fieldKey) => (
+
+                    <button
+                      key={
+                        fieldKey
+                      }
+                      type="button"
+                      disabled={
+                        savingEdit
+                      }
+                      onClick={() =>
+                        handleRemoveField(
+                          fieldKey
+                        )
+                      }
+                      style={{
+                        display:
+                          "flex",
+                        alignItems:
+                          "center",
+                        gap:
+                          "6px",
+                        padding:
+                          "7px 10px",
+                        borderRadius:
+                          "8px",
+                        border:
+                          "1px solid #fecaca",
+                        background:
+                          "#fff1f2",
+                        color:
+                          "#be123c",
+                        cursor:
+                          "pointer",
+                        fontSize:
+                          "12px",
+                      }}
+                      title={`Remove ${formatFieldLabel(
+                        fieldKey
+                      )}`}
+                    >
+
+                      <FaTimes />
+
+                      {
+                        formatFieldLabel(
+                          fieldKey
+                        )
+                      }
+
+                    </button>
+
+                  )
+                )}
+
+              </div>
+
+            </div>
+
+            {/* ACTIONS */}
+
+            <div
+              className="modal-actions"
+              style={{
+                display:
+                  "flex",
+                gap:
+                  "10px",
+                justifyContent:
+                  "flex-end",
+                flexWrap:
+                  "wrap",
+              }}
+            >
+
+              <button
+                type="button"
+                className="secondary-modal-button"
+                onClick={
+                  handleCloseEdit
+                }
+                disabled={
+                  savingEdit
+                }
+              >
+                <FaTimes />
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                className="primary-modal-button"
+                onClick={
+                  handleSaveEdit
+                }
+                disabled={
+                  savingEdit
+                }
+              >
+
+                {savingEdit ? (
+                  <>
+                    <FaSpinner className="fa-spin" />
+                    Saving Changes...
+                  </>
+                ) : (
+                  <>
+                    <FaSave />
+                    Save Changes
+                  </>
+                )}
+
               </button>
 
             </div>

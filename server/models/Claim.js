@@ -1,4 +1,3 @@
-
 // ==========================================
 // Forma AI - Claim Model
 // ==========================================
@@ -70,30 +69,42 @@ const aiAnalysisSchema = new mongoose.Schema(
 
 const claimSchema = new mongoose.Schema(
   {
-    // --------------------------------------
+    // ========================================
     // Claim Number
-    // --------------------------------------
+    // ========================================
 
     claimNumber: {
       type: String,
-      required: [true, "Claim number is required."],
+
+      required: [
+        true,
+        "Claim number is required.",
+      ],
+
       unique: true,
+
       trim: true,
+
+      index: true,
     },
 
-    // --------------------------------------
+    // ========================================
     // User
-    // --------------------------------------
+    // ========================================
 
     userId: {
       type: mongoose.Schema.Types.ObjectId,
+
       ref: "User",
+
       default: null,
+
+      index: true,
     },
 
-    // --------------------------------------
+    // ========================================
     // Insurance Category
-    // --------------------------------------
+    // ========================================
 
     category: {
       type: String,
@@ -117,12 +128,15 @@ const claimSchema = new mongoose.Schema(
       },
 
       lowercase: true,
+
       trim: true,
+
+      index: true,
     },
 
-    // --------------------------------------
+    // ========================================
     // Claim Status
-    // --------------------------------------
+    // ========================================
 
     status: {
       type: String,
@@ -141,74 +155,68 @@ const claimSchema = new mongoose.Schema(
       },
 
       default: "draft",
+
+      index: true,
     },
 
-    // --------------------------------------
+    // ========================================
     // Dynamic Form Data
-    // --------------------------------------
+    // ========================================
+    //
+    // This stores all dynamic form answers.
+    //
+    // Example:
+    //
+    // claimData: {
+    //   incidentType: "animal_collision",
+    //   vehicle: "Honda",
+    //   damage: "windshield",
+    //   location: "I-95"
+    // }
+    //
+    // ========================================
 
     claimData: {
       type: mongoose.Schema.Types.Mixed,
+
       default: () => ({}),
     },
 
-    // --------------------------------------
+    // ========================================
     // Uploaded Documents
-    // --------------------------------------
-    //
-    // Documents are embedded directly inside
-    // the claim document.
-    //
-    // Example:
-    //
-    // documents: [
-    //   {
-    //     name: "CLM-2026-0005.pdf",
-    //     url: "/uploads/pdfs/CLM-2026-0005.pdf",
-    //     type: "claim-pdf"
-    //   }
-    // ]
-    //
+    // ========================================
 
     documents: {
       type: [claimDocumentSchema],
+
       default: [],
     },
 
-    // --------------------------------------
+    // ========================================
     // AI Analysis
-    // --------------------------------------
-    //
-    // AI analysis is embedded directly inside
-    // the claim document.
-    //
-    // Example:
-    //
-    // aiAnalysis: {
-    //   summary: "...",
-    //   confidence: 0.98,
-    //   source: "description"
-    // }
-    //
+    // ========================================
 
     aiAnalysis: {
       type: aiAnalysisSchema,
+
       default: () => ({}),
     },
 
-    // --------------------------------------
+    // ========================================
     // AI Summary
-    // --------------------------------------
+    // ========================================
 
     aiSummary: {
       type: String,
+
       default: "",
+
       trim: true,
     },
 
-    // --------------------------------------
+    // ========================================
     // AI Confidence
-    // --------------------------------------
+    // ========================================
 
     aiConfidence: {
       type: Number,
@@ -226,9 +234,9 @@ const claimSchema = new mongoose.Schema(
       default: null,
     },
 
-    // --------------------------------------
+    // ========================================
     // Risk Score
-    // --------------------------------------
+    // ========================================
 
     riskScore: {
       type: Number,
@@ -246,9 +254,9 @@ const claimSchema = new mongoose.Schema(
       default: null,
     },
 
-    // --------------------------------------
+    // ========================================
     // Risk Level
-    // --------------------------------------
+    // ========================================
 
     riskLevel: {
       type: String,
@@ -268,61 +276,76 @@ const claimSchema = new mongoose.Schema(
       default: "unknown",
     },
 
-    // --------------------------------------
+    // ========================================
     // Reviewer Information
-    // --------------------------------------
+    // ========================================
 
     reviewerNotes: {
       type: String,
+
       default: "",
+
       trim: true,
     },
 
     reviewedBy: {
       type: mongoose.Schema.Types.ObjectId,
+
       ref: "User",
+
       default: null,
     },
 
     reviewedAt: {
       type: Date,
+
       default: null,
     },
 
-    // --------------------------------------
+    // ========================================
     // Submission Information
-    // --------------------------------------
+    // ========================================
 
     submittedAt: {
       type: Date,
+
       default: null,
     },
 
-    // --------------------------------------
+    // ========================================
     // PDF URL
-    // --------------------------------------
+    // ========================================
 
     pdfUrl: {
       type: String,
+
       default: "",
+
       trim: true,
     },
 
-    // --------------------------------------
+    // ========================================
     // Decision Information
-    // --------------------------------------
+    // ========================================
 
     decisionReason: {
       type: String,
+
       default: "",
+
       trim: true,
     },
 
     decisionDate: {
       type: Date,
+
       default: null,
     },
   },
+
+  // ==========================================
+  // Schema Options
+  // ==========================================
 
   {
     timestamps: true,
@@ -330,101 +353,189 @@ const claimSchema = new mongoose.Schema(
 );
 
 // ==========================================
-// Indexes
+// INDEXES
 // ==========================================
 
-// User claims
+// ------------------------------------------
+// User + Created Date
+// ------------------------------------------
 
 claimSchema.index({
   userId: 1,
   createdAt: -1,
 });
 
-// Category + status filtering
+// ------------------------------------------
+// User + Status
+// ------------------------------------------
+
+claimSchema.index({
+  userId: 1,
+  status: 1,
+});
+
+// ------------------------------------------
+// Category + Status
+// ------------------------------------------
 
 claimSchema.index({
   category: 1,
   status: 1,
 });
 
-// Claim number lookup
-//
-// claimNumber already has unique: true,
-// which creates a unique index.
-//
+// ------------------------------------------
+// Category + Created Date
+// ------------------------------------------
 
 claimSchema.index({
-  claimNumber: 1,
+  category: 1,
+  createdAt: -1,
 });
 
+// ------------------------------------------
+// Claim Number
+// ------------------------------------------
+//
+// claimNumber already has:
+//
+// unique: true
+// index: true
+//
+// Therefore MongoDB creates a unique index.
+// No additional claimNumber index is required.
+// ------------------------------------------
+
 // ==========================================
+// PRE-SAVE HOOK
 // Automatically Set Submitted Date
 // ==========================================
 
-claimSchema.pre("save", function (next) {
-  if (
-    this.status === "submitted" &&
-    !this.submittedAt
-  ) {
-    this.submittedAt = new Date();
+claimSchema.pre(
+  "save",
+  function (next) {
+    // ----------------------------------------
+    // When claim becomes submitted
+    // ----------------------------------------
+
+    if (
+      this.status === "submitted" &&
+      !this.submittedAt
+    ) {
+      this.submittedAt = new Date();
+    }
+
+    // ----------------------------------------
+    // When claim returns to draft
+    // ----------------------------------------
+    //
+    // Do not automatically remove submittedAt.
+    // This preserves the submission history.
+    //
+    // ----------------------------------------
+
+    next();
   }
-
-  next();
-});
+);
 
 // ==========================================
-// Pre-validation Logging
+// PRE-VALIDATION LOGGING
 // ==========================================
 
-claimSchema.pre("validate", function (next) {
-  console.log("");
-  console.log("-----------------------------------------");
-  console.log("🔍 CLAIM MODEL VALIDATION");
-  console.log("-----------------------------------------");
+claimSchema.pre(
+  "validate",
+  function (next) {
 
-  console.log(
-    "Claim Number:",
-    this.claimNumber
-  );
+    console.log("");
 
-  console.log(
-    "User ID:",
-    this.userId || "Guest"
-  );
+    console.log(
+      "-----------------------------------------"
+    );
 
-  console.log(
-    "Category:",
-    this.category
-  );
+    console.log(
+      "🔍 CLAIM MODEL VALIDATION"
+    );
 
-  console.log(
-    "Status:",
-    this.status
-  );
+    console.log(
+      "-----------------------------------------"
+    );
 
-  console.log(
-    "Claim Data:",
-    this.claimData
-  );
+    console.log(
+      "Claim ID:",
+      this._id || "New Claim"
+    );
 
-  console.log(
-    "AI Analysis:",
-    this.aiAnalysis
-  );
+    console.log(
+      "Claim Number:",
+      this.claimNumber
+    );
 
-  console.log(
-    "Documents:",
-    this.documents
-  );
+    console.log(
+      "User ID:",
+      this.userId || "Guest"
+    );
 
-  console.log("-----------------------------------------");
-  console.log("");
+    console.log(
+      "Category:",
+      this.category
+    );
 
-  next();
-});
+    console.log(
+      "Status:",
+      this.status
+    );
+
+    console.log(
+      "Claim Data:",
+      this.claimData
+    );
+
+    console.log(
+      "Documents:",
+      this.documents
+    );
+
+    console.log(
+      "AI Analysis:",
+      this.aiAnalysis
+    );
+
+    console.log(
+      "AI Summary:",
+      this.aiSummary
+    );
+
+    console.log(
+      "AI Confidence:",
+      this.aiConfidence
+    );
+
+    console.log(
+      "Risk Score:",
+      this.riskScore
+    );
+
+    console.log(
+      "Risk Level:",
+      this.riskLevel
+    );
+
+    console.log(
+      "Submitted At:",
+      this.submittedAt
+    );
+
+    console.log(
+      "-----------------------------------------"
+    );
+
+    console.log("");
+
+    next();
+  }
+);
 
 // ==========================================
-// Create Model
+// CREATE MODEL
 // ==========================================
 
 const Claim = mongoose.model(
@@ -433,8 +544,7 @@ const Claim = mongoose.model(
 );
 
 // ==========================================
-// Export Model
+// EXPORT MODEL
 // ==========================================
 
 export default Claim;
-
