@@ -1,4 +1,3 @@
-
 // ==========================================
 // Forma AI - Backend Server
 // ==========================================
@@ -14,8 +13,13 @@ import connectDB from "./config/db.js";
 
 const PORT = process.env.PORT || 5000;
 
+const NODE_ENV = process.env.NODE_ENV || "development";
+
+const CLIENT_URL =
+  process.env.CLIENT_URL || "http://localhost:5173";
+
 // ==========================================
-// Check Required Environment Variables
+// Environment Check
 // ==========================================
 
 console.log("=========================================");
@@ -24,25 +28,65 @@ console.log("=========================================");
 
 console.log(
   "🔑 Gemini API Key:",
-  process.env.GEMINI_API_KEY ? "FOUND ✅" : "MISSING ❌"
+  process.env.GEMINI_API_KEY
+    ? "FOUND ✅"
+    : "MISSING ❌"
+);
+
+console.log(
+  "🤖 Gemini Model:",
+  process.env.GEMINI_MODEL ||
+    "gemini-2.5-flash"
 );
 
 console.log(
   "🗄️ MongoDB URI:",
-  process.env.MONGO_URI ? "FOUND ✅" : "MISSING ❌"
+  process.env.MONGO_URI
+    ? "FOUND ✅"
+    : "MISSING ❌"
 );
 
 console.log(
   "🌐 Client URL:",
-  process.env.CLIENT_URL || "Not configured"
+  CLIENT_URL
 );
 
 console.log(
   "📦 Environment:",
-  process.env.NODE_ENV || "development"
+  NODE_ENV
 );
 
 console.log("=========================================");
+
+// ==========================================
+// Validate Environment Variables
+// ==========================================
+
+const validateEnvironment = () => {
+  const missingVariables = [];
+
+  if (!process.env.GEMINI_API_KEY) {
+    missingVariables.push("GEMINI_API_KEY");
+  }
+
+  if (!process.env.MONGO_URI) {
+    missingVariables.push("MONGO_URI");
+  }
+
+  if (missingVariables.length > 0) {
+    throw new Error(
+      `Missing required environment variables: ${missingVariables.join(
+        ", "
+      )}. Please check server/.env`
+    );
+  }
+};
+
+// ==========================================
+// Server Reference
+// ==========================================
+
+let server;
 
 // ==========================================
 // Start Server
@@ -51,91 +95,164 @@ console.log("=========================================");
 const startServer = async () => {
   try {
     // --------------------------------------
-    // Validate Gemini API Key
+    // Validate Environment
     // --------------------------------------
 
-    if (!process.env.GEMINI_API_KEY) {
-      throw new Error(
-        "GEMINI_API_KEY is missing. Please check server/.env"
-      );
-    }
+    console.log("🔍 Validating environment...");
 
-    // --------------------------------------
-    // Validate MongoDB URI
-    // --------------------------------------
+    validateEnvironment();
 
-    if (!process.env.MONGO_URI) {
-      throw new Error(
-        "MONGO_URI is missing. Please check server/.env"
-      );
-    }
+    console.log("✅ Environment validation successful");
 
     // --------------------------------------
     // Connect MongoDB
     // --------------------------------------
 
+    console.log("🔌 Connecting to MongoDB...");
+
     await connectDB();
 
-    console.log("✅ MongoDB Connected Successfully");
+    console.log(
+      "✅ MongoDB Connected Successfully"
+    );
 
     // --------------------------------------
     // Start Express Server
     // --------------------------------------
 
-    const server = app.listen(PORT, () => {
+    server = app.listen(PORT, () => {
+      console.log("");
       console.log("=========================================");
-      console.log("🚀 Forma AI Backend Started Successfully");
-      console.log("=========================================");
-      console.log(`🌐 Server URL   : http://localhost:${PORT}`);
       console.log(
-        `📦 Environment  : ${process.env.NODE_ENV || "development"}`
+        "🚀 Forma AI Backend Started Successfully"
       );
-      console.log(`📂 API Base URL : http://localhost:${PORT}/api`);
-      console.log("🤖 Gemini AI    : Configured ✅");
       console.log("=========================================");
+      console.log(
+        `🌐 Server URL   : http://localhost:${PORT}`
+      );
+      console.log(
+        `📦 Environment  : ${NODE_ENV}`
+      );
+      console.log(
+        `📂 API Base URL : http://localhost:${PORT}/api`
+      );
+      console.log(
+        `🤖 Gemini AI    : Configured ✅`
+      );
+      console.log(
+        `🧠 Gemini Model : ${
+          process.env.GEMINI_MODEL ||
+          "gemini-2.5-flash"
+        }`
+      );
+      console.log(
+        `📄 Document AI  : PDF + Image Recognition ✅`
+      );
+      console.log(
+        `🖼️ Image AI      : Enabled ✅`
+      );
+      console.log(
+        `📑 PDF AI        : Enabled ✅`
+      );
+      console.log("=========================================");
+      console.log("");
+    });
+
+    // ======================================
+    // Handle Server Error
+    // ======================================
+
+    server.on("error", (error) => {
+      console.error(
+        "========================================="
+      );
+      console.error(
+        "❌ Express Server Error"
+      );
+      console.error(
+        "========================================="
+      );
+
+      if (error.code === "EADDRINUSE") {
+        console.error(
+          `❌ Port ${PORT} is already in use.`
+        );
+
+        console.error(
+          `💡 Stop the existing process or use another PORT.`
+        );
+      } else {
+        console.error(error);
+      }
+
+      process.exit(1);
     });
 
     // ======================================
     // Handle Unhandled Promise Rejections
     // ======================================
 
-    process.on("unhandledRejection", (error) => {
-      console.error("=========================================");
-      console.error("❌ Unhandled Promise Rejection");
-      console.error("=========================================");
-      console.error(error);
+    process.on(
+      "unhandledRejection",
+      (error) => {
+        console.error(
+          "========================================="
+        );
 
-      server.close(() => {
-        process.exit(1);
-      });
-    });
+        console.error(
+          "❌ Unhandled Promise Rejection"
+        );
+
+        console.error(
+          "========================================="
+        );
+
+        console.error(error);
+
+        gracefulShutdown(
+          "UNHANDLED_REJECTION"
+        );
+      }
+    );
 
     // ======================================
     // Handle Uncaught Exceptions
     // ======================================
 
-    process.on("uncaughtException", (error) => {
-      console.error("=========================================");
-      console.error("❌ Uncaught Exception");
-      console.error("=========================================");
-      console.error(error);
+    process.on(
+      "uncaughtException",
+      (error) => {
+        console.error(
+          "========================================="
+        );
 
-      server.close(() => {
-        process.exit(1);
-      });
-    });
+        console.error(
+          "❌ Uncaught Exception"
+        );
+
+        console.error(
+          "========================================="
+        );
+
+        console.error(error);
+
+        gracefulShutdown(
+          "UNCAUGHT_EXCEPTION"
+        );
+      }
+    );
 
     // ======================================
-    // Graceful Shutdown - Ctrl + C
+    // Graceful Shutdown - SIGINT
     // ======================================
 
     process.on("SIGINT", () => {
-      console.log("\n🛑 Forma AI Server Stopping...");
+      console.log("");
+      console.log(
+        "🛑 Forma AI Server Stopping..."
+      );
 
-      server.close(() => {
-        console.log("✅ Server closed successfully.");
-        process.exit(0);
-      });
+      gracefulShutdown("SIGINT");
     });
 
     // ======================================
@@ -143,26 +260,81 @@ const startServer = async () => {
     // ======================================
 
     process.on("SIGTERM", () => {
-      console.log("\n🛑 Forma AI Server Terminating...");
+      console.log("");
+      console.log(
+        "🛑 Forma AI Server Terminating..."
+      );
 
-      server.close(() => {
-        console.log("✅ Server closed successfully.");
-        process.exit(0);
-      });
+      gracefulShutdown("SIGTERM");
     });
   } catch (error) {
     // ======================================
-    // Server Startup Error
+    // Startup Error
     // ======================================
 
-    console.error("=========================================");
-    console.error("❌ Failed to Start Forma AI Backend");
-    console.error("=========================================");
-    console.error("Error:", error.message);
-    console.error("=========================================");
+    console.error("");
+    console.error(
+      "========================================="
+    );
+
+    console.error(
+      "❌ Failed to Start Forma AI Backend"
+    );
+
+    console.error(
+      "========================================="
+    );
+
+    console.error(
+      "Error:",
+      error.message
+    );
+
+    console.error(
+      "========================================="
+    );
 
     process.exit(1);
   }
+};
+
+// ==========================================
+// Graceful Shutdown Function
+// ==========================================
+
+const gracefulShutdown = (signal) => {
+  console.log(
+    `📡 Shutdown signal received: ${signal}`
+  );
+
+  if (!server) {
+    console.log(
+      "⚠️ Server was not running."
+    );
+
+    process.exit(0);
+  }
+
+  server.close(() => {
+    console.log(
+      "✅ HTTP server closed successfully."
+    );
+
+    console.log(
+      "👋 Forma AI Backend stopped."
+    );
+
+    process.exit(0);
+  });
+
+  // Force shutdown after 10 seconds
+  setTimeout(() => {
+    console.error(
+      "⚠️ Forced shutdown after timeout."
+    );
+
+    process.exit(1);
+  }, 10000);
 };
 
 // ==========================================
@@ -170,4 +342,3 @@ const startServer = async () => {
 // ==========================================
 
 startServer();
-

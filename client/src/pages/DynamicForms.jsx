@@ -1,5 +1,7 @@
 // ==========================================
 // Forma AI - Dynamic Insurance Claim Forms
+// Premium UI Version
+// PART 1
 // ==========================================
 
 import React, { useEffect, useState } from "react";
@@ -27,33 +29,43 @@ import {
   FaEye,
   FaTimes,
   FaCheck,
+  FaStar,
+  FaShieldVirus,
+  FaClock,
+  FaUserShield,
 } from "react-icons/fa";
 
+// ==========================================
 // Components
+// ==========================================
+
 import CategoryCard from "../components/forms/CategoryCard";
 import ProgressStepper from "../components/forms/ProgressStepper";
 import AIUploader from "../components/forms/AIUploader";
 import ManualForm from "../components/forms/ManualForm";
 
-// Backend API
+// ==========================================
+// Backend Services
+// ==========================================
+
 import {
   createClaim,
   updateClaim,
   submitClaim,
 } from "../services/claimService";
 
-// PDF Generator
 import { generateClaimPDF } from "../services/pdfService";
 
 // ==========================================
-// COMPONENT
+// COMPONENT START
 // ==========================================
 
 const DynamicForms = () => {
+
   const navigate = useNavigate();
 
   // ==========================================
-  // STATE
+  // FORM STATE
   // ==========================================
 
   const [selectedCategory, setSelectedCategory] =
@@ -76,6 +88,10 @@ const DynamicForms = () => {
   const [categoryFormData, setCategoryFormData] =
     useState({});
 
+  // ==========================================
+  // CLAIM STATE
+  // ==========================================
+
   const [claimId, setClaimId] =
     useState(null);
 
@@ -92,7 +108,7 @@ const DynamicForms = () => {
     useState("");
 
   // ==========================================
-  // PDF STATES
+  // PDF STATE
   // ==========================================
 
   const [pdfUrl, setPdfUrl] =
@@ -112,6 +128,12 @@ const DynamicForms = () => {
     useState(false);
 
   const [successClaimNumber, setSuccessClaimNumber] =
+    useState("");
+
+  const [submissionDate, setSubmissionDate] =
+    useState("");
+
+  const [successApplicant, setSuccessApplicant] =
     useState("");
 
   // ==========================================
@@ -166,10 +188,11 @@ const DynamicForms = () => {
   ];
 
   // ==========================================
-  // COMMON INPUT
+  // COMMON INPUT HANDLER
   // ==========================================
 
   const handleChange = (e) => {
+
     const { name, value } = e.target;
 
     setFormData((previous) => ({
@@ -187,10 +210,11 @@ const DynamicForms = () => {
   };
 
   // ==========================================
-  // CATEGORY CHANGE
+  // RESET WHEN CATEGORY CHANGES
   // ==========================================
 
   const handleCategoryChange = (category) => {
+
     setSelectedCategory(category);
 
     setCategoryFormData({});
@@ -211,8 +235,6 @@ const DynamicForms = () => {
 
     setShowSuccessModal(false);
 
-    setSuccessClaimNumber("");
-
     setCurrentStep(1);
   };
 
@@ -220,141 +242,121 @@ const DynamicForms = () => {
   // COMPLETE CLAIM DATA
   // ==========================================
 
-  const getCompleteClaimData = () => {
-    return {
-      ...formData,
-      ...categoryFormData,
-    };
-  };
+  const getCompleteClaimData = () => ({
+    ...formData,
+    ...categoryFormData,
+  });
 
   // ==========================================
-  // SAVE CLAIM
+  // SAVE CLAIM (CREATE / UPDATE)
   // ==========================================
 
   const saveClaim = async () => {
+
     setLoading(true);
+
     setMessage("");
+
     setError("");
 
     try {
+
       const completeClaimData =
         getCompleteClaimData();
 
-      console.log(
-        "========================================="
-      );
-
-      console.log("📤 SAVE CLAIM");
-
-      console.log(
-        "========================================="
-      );
-
-      console.log(
-        "Category:",
-        selectedCategory
-      );
-
-      console.log(
-        "Claim Data:",
-        completeClaimData
-      );
-
       let result;
 
-      // ========================================
-      // CREATE CLAIM
-      // ========================================
+      console.log("================================");
+      console.log("📤 SAVE CLAIM");
+      console.log("Category:", selectedCategory);
+      console.log(completeClaimData);
+      console.log("================================");
+
+      // CREATE NEW CLAIM
 
       if (!claimId) {
+
         result = await createClaim(
           completeClaimData,
           selectedCategory
         );
 
-        const newClaimId =
-          result?.claim?._id;
+        const newClaim =
+          result?.claim || {};
 
-        const newClaimNumber =
-          result?.claim?.claimNumber;
-
-        if (newClaimId) {
-          setClaimId(newClaimId);
+        if (newClaim._id) {
+          setClaimId(newClaim._id);
         }
 
-        if (newClaimNumber) {
-          setClaimNumber(newClaimNumber);
+        if (newClaim.claimNumber) {
+          setClaimNumber(newClaim.claimNumber);
         }
 
         setMessage(
-          `Draft saved successfully${
-            newClaimNumber
-              ? ` — ${newClaimNumber}`
-              : ""
-          }`
+          `Draft Saved Successfully • ${newClaim.claimNumber || ""}`
         );
+
       }
 
-      // ========================================
-      // UPDATE CLAIM
-      // ========================================
+      // UPDATE EXISTING CLAIM
 
       else {
+
         result = await updateClaim(
           claimId,
           completeClaimData,
           selectedCategory
         );
 
-        if (result?.claim?.claimNumber) {
-          setClaimNumber(
-            result.claim.claimNumber
-          );
+        const updated =
+          result?.claim || {};
+
+        if (updated.claimNumber) {
+          setClaimNumber(updated.claimNumber);
         }
 
         setMessage(
-          "Claim draft updated successfully."
+          "Draft Updated Successfully."
         );
       }
 
-      console.log(
-        "✅ Save claim successful:",
-        result
-      );
+      console.log("Draft Saved", result);
 
       return result;
-    } catch (err) {
-      console.error(
-        "❌ Save Claim Error:",
-        err
-      );
 
-      console.error(
-        "Server Response:",
-        err.response?.data
-      );
+    } catch (err) {
+
+      console.error(err);
 
       setError(
         err.response?.data?.message ||
-          err.message ||
-          "Unable to save claim. Please try again."
+        err.message ||
+        "Unable to save draft."
       );
 
       throw err;
+
     } finally {
+
       setLoading(false);
+
     }
   };
 
   // ==========================================
-  // SAVE DRAFT
+  // SAVE DRAFT BUTTON
   // ==========================================
 
   const handleSaveDraft = async () => {
+
     try {
+
       await saveClaim();
+
     } catch (err) {
+
       console.error(err);
+
     }
   };
 
@@ -363,19 +365,17 @@ const DynamicForms = () => {
   // ==========================================
 
   const nextStep = async () => {
+
     try {
+
       await saveClaim();
 
       if (currentStep < 5) {
-        setCurrentStep(
-          (previous) => previous + 1
-        );
+        setCurrentStep((prev) => prev + 1);
       }
+
     } catch (err) {
-      console.error(
-        "Continue Error:",
-        err
-      );
+      console.error(err);
     }
   };
 
@@ -384,41 +384,48 @@ const DynamicForms = () => {
   // ==========================================
 
   const previousStep = () => {
+
     if (currentStep > 1) {
-      setCurrentStep(
-        (previous) => previous - 1
-      );
+      setCurrentStep((prev) => prev - 1);
     }
   };
 
   // ==========================================
-  // CLOSE SUCCESS MODAL
+  // PDF FUNCTIONS
   // ==========================================
 
-  const handleCloseSuccessModal = () => {
-    setShowSuccessModal(false);
+  const handleDownloadPDF = () => {
+
+    if (!pdfUrl) return;
+
+    const link =
+      document.createElement("a");
+
+    link.href = pdfUrl;
+
+    link.download =
+      pdfFileName || "FormaAI-Claim.pdf";
+
+    document.body.appendChild(link);
+
+    link.click();
+
+    document.body.removeChild(link);
+  };
+
+  const handleOpenPDF = () => {
+
+    if (!pdfUrl) return;
+
+    window.open(
+      pdfUrl,
+      "_blank",
+      "noopener,noreferrer"
+    );
   };
 
   // ==========================================
-  // VIEW PDF FROM SUCCESS MODAL
-  // ==========================================
-
-  const handleSuccessViewPDF = () => {
-    setShowSuccessModal(false);
-
-    setShowPdf(true);
-
-    if (pdfUrl) {
-      window.open(
-        pdfUrl,
-        "_blank",
-        "noopener,noreferrer"
-      );
-    }
-  };
-
-  // ==========================================
-  // SUBMIT CLAIM + GENERATE PDF
+  // SUBMIT CLAIM + GENERATE PDF + SUCCESS POPUP
   // ==========================================
 
   const handleSubmitClaim = async () => {
@@ -427,240 +434,151 @@ const DynamicForms = () => {
     setError("");
 
     try {
-      const completeClaimData =
-        getCompleteClaimData();
+      const completeClaimData = getCompleteClaimData();
 
-      console.log(
-        "========================================="
-      );
-
+      console.log("======================================");
       console.log("🚀 SUBMITTING CLAIM");
-
-      console.log(
-        "========================================="
-      );
-
-      console.log(
-        "Category:",
-        selectedCategory
-      );
-
-      console.log(
-        "Complete Claim Data:",
-        completeClaimData
-      );
+      console.log("Category :", selectedCategory);
+      console.log("Claim Data :", completeClaimData);
+      console.log("======================================");
 
       let currentClaimId = claimId;
-
       let currentClaim = {};
 
-      // ========================================
-      // CREATE CLAIM IF NEEDED
-      // ========================================
+      // ======================================
+      // CREATE CLAIM IF NOT CREATED
+      // ======================================
 
       if (!currentClaimId) {
-        const createResult =
-          await createClaim(
-            completeClaimData,
-            selectedCategory
-          );
-
-        console.log(
-          "✅ Create Result:",
-          createResult
+        const createResult = await createClaim(
+          completeClaimData,
+          selectedCategory
         );
 
-        currentClaim =
-          createResult?.claim || {};
-
-        currentClaimId =
-          currentClaim?._id;
+        currentClaim = createResult?.claim || {};
+        currentClaimId = currentClaim._id;
 
         if (!currentClaimId) {
-          throw new Error(
-            "Claim was created but no claim ID was returned."
-          );
+          throw new Error("Failed to create claim.");
         }
 
         setClaimId(currentClaimId);
 
         if (currentClaim.claimNumber) {
-          setClaimNumber(
-            currentClaim.claimNumber
-          );
+          setClaimNumber(currentClaim.claimNumber);
         }
       }
 
-      // ========================================
+      // ======================================
       // UPDATE EXISTING CLAIM
-      // ========================================
+      // ======================================
 
       else {
-        const updateResult =
-          await updateClaim(
-            currentClaimId,
-            completeClaimData,
-            selectedCategory
-          );
-
-        console.log(
-          "✅ Update Result:",
-          updateResult
+        const updateResult = await updateClaim(
+          currentClaimId,
+          completeClaimData,
+          selectedCategory
         );
 
-        currentClaim =
-          updateResult?.claim || {};
+        currentClaim = updateResult?.claim || currentClaim;
 
         if (currentClaim.claimNumber) {
-          setClaimNumber(
-            currentClaim.claimNumber
-          );
+          setClaimNumber(currentClaim.claimNumber);
         }
       }
 
-      // ========================================
-      // SUBMIT CLAIM
-      // ========================================
+      // ======================================
+      // SUBMIT CLAIM TO BACKEND
+      // ======================================
 
-      const submitResult =
-        await submitClaim(
-          currentClaimId
-        );
+      const submitResult = await submitClaim(currentClaimId);
 
-      console.log(
-        "✅ Submit Result:",
-        submitResult
-      );
-
-      const submittedClaim =
-        submitResult?.claim ||
-        currentClaim ||
-        {};
+      const submittedClaim = submitResult?.claim || currentClaim;
 
       const finalClaimNumber =
         submittedClaim.claimNumber ||
         claimNumber ||
         `CLM-${Date.now()}`;
 
-      const finalSubmittedClaim = {
+      const finalClaim = {
         ...submittedClaim,
-
         _id: currentClaimId,
-
-        claimNumber:
-          finalClaimNumber,
-
-        category:
-          submittedClaim.category ||
-          selectedCategory,
-
-        status:
-          submittedClaim.status ||
-          "submitted",
-
-        submittedAt:
-          submittedClaim.submittedAt ||
-          new Date().toISOString(),
+        claimNumber: finalClaimNumber,
+        category: selectedCategory,
+        status: "submitted",
+        submittedAt: new Date().toISOString(),
       };
 
-      setClaimNumber(
-        finalClaimNumber
-      );
+      setClaimNumber(finalClaimNumber);
 
-      // ========================================
-      // REMOVE OLD PDF URL
-      // ========================================
+      // ======================================
+      // REMOVE OLD PDF
+      // ======================================
 
       if (pdfUrl) {
         URL.revokeObjectURL(pdfUrl);
       }
 
-      // ========================================
+      // ======================================
       // GENERATE PDF
-      // ========================================
+      // ======================================
 
-      const generatedPDF =
-        generateClaimPDF({
-          claim:
-            finalSubmittedClaim,
+      const generatedPDF = generateClaimPDF({
+        claim: finalClaim,
+        category: selectedCategory,
+        claimData: completeClaimData,
+      });
 
-          category:
-            selectedCategory,
-
-          claimData:
-            completeClaimData,
-        });
-
-      if (
-        !generatedPDF ||
-        !generatedPDF.url
-      ) {
-        throw new Error(
-          "PDF was not generated."
-        );
+      if (!generatedPDF?.url) {
+        throw new Error("Unable to generate PDF.");
       }
 
-      // ========================================
-      // STORE PDF
-      // ========================================
-
-      setPdfUrl(
-        generatedPDF.url
-      );
+      setPdfUrl(generatedPDF.url);
 
       setPdfFileName(
-        generatedPDF.fileName ||
-          `${finalClaimNumber}.pdf`
+        generatedPDF.fileName || `${finalClaimNumber}.pdf`
       );
 
       setShowPdf(true);
 
-      // ========================================
-      // SUCCESS MESSAGE
-      // ========================================
+      // ======================================
+      // SUCCESS POPUP DETAILS
+      // ======================================
 
-      setMessage(
-        `Claim submitted successfully — ${finalClaimNumber}`
+      setSuccessClaimNumber(finalClaimNumber);
+
+      setSuccessApplicant(
+        formData.applicantName ||
+          categoryFormData.patientName ||
+          categoryFormData.driverName ||
+          categoryFormData.ownerName ||
+          categoryFormData.travelerName ||
+          categoryFormData.policyHolderName ||
+          "Applicant"
       );
 
-      setSuccessClaimNumber(
-        finalClaimNumber
+      setSubmissionDate(
+        new Date().toLocaleString("en-IN", {
+          dateStyle: "full",
+          timeStyle: "short",
+        })
+      );
+
+      setMessage(
+        `Claim Submitted Successfully • ${finalClaimNumber}`
       );
 
       setCurrentStep(5);
 
-      // ========================================
-      // SHOW SUCCESS POPUP
-      // ========================================
-
+      // Open Premium Success Popup
       setShowSuccessModal(true);
 
-      console.log(
-        "========================================="
-      );
-
-      console.log(
-        "🎉 CLAIM SUBMITTED SUCCESSFULLY"
-      );
-
-      console.log(
-        "Claim Number:",
-        finalClaimNumber
-      );
-
-      console.log(
-        "========================================="
-      );
+      console.log("======================================");
+      console.log("✅ CLAIM SUBMITTED SUCCESSFULLY");
+      console.log("Claim Number :", finalClaimNumber);
+      console.log("======================================");
     } catch (err) {
-      console.error(
-        "❌ Submit Claim Error:",
-        err
-      );
-
-      console.error(
-        "Server Response:",
-        err.response?.data
-      );
+      console.error("Submit Claim Error :", err);
 
       setError(
         err.response?.data?.message ||
@@ -673,48 +591,27 @@ const DynamicForms = () => {
   };
 
   // ==========================================
-  // DOWNLOAD PDF
+  // SUCCESS POPUP ACTION BUTTONS
   // ==========================================
 
-  const handleDownloadPDF = () => {
-    if (!pdfUrl) {
-      return;
+  const handleSuccessViewPDF = () => {
+    setShowSuccessModal(false);
+
+    if (pdfUrl) {
+      window.open(pdfUrl, "_blank", "noopener,noreferrer");
     }
+  };
 
-    const link =
-      document.createElement("a");
+  const handleSuccessDownloadPDF = () => {
+    handleDownloadPDF();
+  };
 
-    link.href = pdfUrl;
-
-    link.download =
-      pdfFileName ||
-      "forma-ai-claim.pdf";
-
-    document.body.appendChild(link);
-
-    link.click();
-
-    document.body.removeChild(link);
+  const handleCloseSuccessModal = () => {
+    setShowSuccessModal(false);
   };
 
   // ==========================================
-  // OPEN PDF IN NEW TAB
-  // ==========================================
-
-  const handleOpenPDF = () => {
-    if (!pdfUrl) {
-      return;
-    }
-
-    window.open(
-      pdfUrl,
-      "_blank",
-      "noopener,noreferrer"
-    );
-  };
-
-  // ==========================================
-  // CLEAN PDF URL
+  // AUTO CLEANUP PDF URL
   // ==========================================
 
   useEffect(() => {
@@ -726,1069 +623,450 @@ const DynamicForms = () => {
   }, [pdfUrl]);
 
   // ==========================================
-  // RENDER
+  // RENDER STARTS HERE
   // ==========================================
 
   return (
+    
     <div className="dynamicPage">
 
-      {/* ======================================
-          HERO
-      ====================================== */}
+    {/* ================= HERO SECTION ================= */}
 
-      <section className="heroBanner">
+    <section className="heroBanner">
 
-        <div className="heroLeft">
+      <div className="heroLeft">
 
-          <span className="heroBadge">
-            <FaRobot />
-            AI Powered Insurance Forms
-          </span>
+        <span className="heroBadge">
+          <FaRobot />
+          AI Powered Insurance Forms
+        </span>
 
-          <h1>
-            Forma AI Dynamic Insurance Claim Portal
-          </h1>
+        <h1>Forma AI Dynamic Insurance Claim Portal</h1>
 
-          <p>
-            Smart AI-Augmented Dynamic Form Engine
-            for Health, Vehicle, Property, Travel
-            and Life Insurance Claims. Upload PDFs,
-            images or manually fill your insurance
-            application within minutes.
-          </p>
+        <p>
+          AI-Augmented Dynamic Insurance Claim Engine for Health, Vehicle,
+          Property, Travel and Life Insurance. Fill claims manually or let
+          AI extract information from PDFs and Images.
+        </p>
 
-          <div className="heroButtons">
+        <div className="heroButtons">
 
-            <button
-              className="primaryBtn"
-              type="button"
-              onClick={() =>
-                navigate("/ai-parser")
-              }
-            >
-              <FaMagic />
-              AI Auto Fill
-            </button>
+          <button
+            className="primaryBtn"
+            onClick={() => navigate("/ai-parser")}
+          >
+            <FaMagic />
+            AI Auto Fill
+          </button>
 
-            <button
-              className="secondaryBtn"
-              type="button"
-              onClick={() =>
-                setApplicationMode("manual")
-              }
-            >
-              <FaClipboardList />
-              Manual Application
-            </button>
-
-          </div>
-
-        </div>
-
-        <div className="heroRight">
-
-          <div className="statCard">
+          <button
+            className="secondaryBtn"
+            onClick={() => setApplicationMode("manual")}
+          >
             <FaClipboardList />
-
-            <div>
-              <h2>120+</h2>
-
-              <span>
-                Insurance Templates
-              </span>
-            </div>
-          </div>
-
-          <div className="statCard">
-            <FaRobot />
-
-            <div>
-              <h2>98%</h2>
-
-              <span>
-                AI Accuracy
-              </span>
-            </div>
-          </div>
-
-          <div className="statCard">
-            <FaBolt />
-
-            <div>
-              <h2>25,000+</h2>
-
-              <span>
-                Claims Submitted
-              </span>
-            </div>
-          </div>
-
-          <div className="statCard">
-            <FaCheckCircle />
-
-            <div>
-              <h2>95%</h2>
-
-              <span>
-                Success Rate
-              </span>
-            </div>
-          </div>
+            Manual Application
+          </button>
 
         </div>
 
-      </section>
+      </div>
 
-      {/* ======================================
-          PROGRESS
-      ====================================== */}
+      <div className="heroRight">
 
-      <ProgressStepper
-        step={currentStep}
-      />
-
-      {/* ======================================
-          CATEGORY
-      ====================================== */}
-
-      <section className="categorySection">
-
-        <div className="sectionTitle">
-
-          <h2>
-            Choose Insurance Category
-          </h2>
-
-          <p>
-            Select the insurance claim template
-            that matches your incident.
-          </p>
-
+        <div className="statCard">
+          <FaClipboardList />
+          <div>
+            <h2>120+</h2>
+            <span>Insurance Templates</span>
+          </div>
         </div>
 
-        <div className="categoryGrid">
-
-          {insuranceCategories.map(
-            (category) => (
-              <CategoryCard
-                key={category.id}
-                category={category}
-                selected={
-                  selectedCategory ===
-                  category.id
-                }
-                onSelect={() =>
-                  handleCategoryChange(
-                    category.id
-                  )
-                }
-              />
-            )
-          )}
-
+        <div className="statCard">
+          <FaRobot />
+          <div>
+            <h2>98%</h2>
+            <span>AI Accuracy</span>
+          </div>
         </div>
 
-      </section>
-
-      {/* ======================================
-          APPLICATION MODE
-      ====================================== */}
-
-      <section className="modeSection">
-
-        <div className="sectionTitle">
-
-          <h2>
-            Choose Application Method
-          </h2>
-
-          <p>
-            Forma AI supports AI-assisted
-            applications, manual applications,
-            image OCR and PDF extraction.
-          </p>
-
+        <div className="statCard">
+          <FaBolt />
+          <div>
+            <h2>25K+</h2>
+            <span>Claims Submitted</span>
+          </div>
         </div>
 
-        <div className="modeGrid">
-
-          <div
-            className={
-              applicationMode === "manual"
-                ? "modeCard activeMode"
-                : "modeCard"
-            }
-            onClick={() =>
-              setApplicationMode("manual")
-            }
-          >
-            <FaKeyboard className="modeIcon" />
-
-            <h3>
-              Manual Application
-            </h3>
-
-            <p>
-              Fill insurance forms manually.
-            </p>
+        <div className="statCard">
+          <FaCheckCircle />
+          <div>
+            <h2>95%</h2>
+            <span>Success Rate</span>
           </div>
-
-          <div
-            className={
-              applicationMode === "ai"
-                ? "modeCard activeMode"
-                : "modeCard"
-            }
-            onClick={() =>
-              setApplicationMode("ai")
-            }
-          >
-            <FaRobot className="modeIcon" />
-
-            <h3>
-              AI Auto Fill
-            </h3>
-
-            <p>
-              Paste your incident description.
-            </p>
-          </div>
-
-          <div
-            className={
-              applicationMode === "image"
-                ? "modeCard activeMode"
-                : "modeCard"
-            }
-            onClick={() =>
-              setApplicationMode("image")
-            }
-          >
-            <FaCamera className="modeIcon" />
-
-            <h3>
-              Image Upload
-            </h3>
-
-            <p>
-              Upload accident photos for OCR.
-            </p>
-          </div>
-
-          <div
-            className={
-              applicationMode === "pdf"
-                ? "modeCard activeMode"
-                : "modeCard"
-            }
-            onClick={() =>
-              setApplicationMode("pdf")
-            }
-          >
-            <FaFilePdf className="modeIcon" />
-
-            <h3>
-              PDF Upload
-            </h3>
-
-            <p>
-              Upload FIR, Bills, Medical Reports.
-            </p>
-          </div>
-
         </div>
 
-      </section>
+      </div>
 
-      {/* ======================================
-          AI / IMAGE / PDF UPLOADER
-      ====================================== */}
+    </section>
 
-      {(applicationMode === "ai" ||
-        applicationMode === "image" ||
-        applicationMode === "pdf") && (
-        <AIUploader
-          mode={applicationMode}
-        />
-      )}
+    {/* ================= PROGRESS STEPPER ================= */}
 
-      {/* ======================================
-          MANUAL FORM
-      ====================================== */}
+    <ProgressStepper step={currentStep} />
 
-      {applicationMode === "manual" && (
+    {/* ================= CATEGORY SECTION ================= */}
 
-        <section className="manualSection">
+    <section className="categorySection">
 
-          <div className="manualHeader">
+      <div className="sectionTitle">
 
-            <div>
+        <span className="sectionBadge">
+          <FaShieldVirus />
+          AI Insurance Categories
+        </span>
 
-              <h2>
-                Insurance Claim Application
-              </h2>
+        <h2>Choose Insurance Category</h2>
 
-              <p>
-                Selected Category :
-                <strong>
-                  {" "}
-                  {selectedCategory.toUpperCase()}
-                </strong>
-              </p>
+        <p>
+          Select the insurance claim template that matches your incident.
+          Every category is powered by AI validation and dynamic forms.
+        </p>
 
-            </div>
+      </div>
 
-            <span className="manualBadge">
-              AI Smart Validation Enabled
-            </span>
+      <div className="categoryGrid">
 
-          </div>
+        {insuranceCategories.map((category) => (
 
-          {/* COMMON APPLICANT INFORMATION */}
-
-          <div className="commonCard">
-
-            <h3>
-              Applicant Information
-            </h3>
-
-            <div className="grid2">
-
-              <div className="inputGroup">
-
-                <label>
-                  Applicant Name
-                </label>
-
-                <input
-                  name="applicantName"
-                  value={
-                    formData.applicantName
-                  }
-                  onChange={
-                    handleChange
-                  }
-                  placeholder="Enter Full Name"
-                />
-
-              </div>
-
-              <div className="inputGroup">
-
-                <label>
-                  Email Address
-                </label>
-
-                <input
-                  type="email"
-                  name="email"
-                  value={
-                    formData.email
-                  }
-                  onChange={
-                    handleChange
-                  }
-                  placeholder="email@example.com"
-                />
-
-              </div>
-
-              <div className="inputGroup">
-
-                <label>
-                  Mobile Number
-                </label>
-
-                <input
-                  type="tel"
-                  name="phone"
-                  value={
-                    formData.phone
-                  }
-                  onChange={
-                    handleChange
-                  }
-                  placeholder="+91 9876543210"
-                />
-
-              </div>
-
-              <div className="inputGroup">
-
-                <label>
-                  Policy Number
-                </label>
-
-                <input
-                  name="policyNumber"
-                  value={
-                    formData.policyNumber
-                  }
-                  onChange={
-                    handleChange
-                  }
-                  placeholder="POL-2026-10021"
-                />
-
-              </div>
-
-            </div>
-
-            <div className="inputGroup fullWidth">
-
-              <label>
-                Describe Your Claim
-              </label>
-
-              <textarea
-                rows="4"
-                name="description"
-                value={
-                  formData.description
-                }
-                onChange={
-                  handleChange
-                }
-                placeholder="Explain your insurance claim in detail..."
-              />
-
-            </div>
-
-          </div>
-
-          {/* CATEGORY FORM */}
-
-          <ManualForm
-            category={selectedCategory}
-            onFormDataChange={
-              handleCategoryFormData
-            }
+          <CategoryCard
+            key={category.id}
+            category={category}
+            selected={selectedCategory === category.id}
+            onSelect={() => handleCategoryChange(category.id)}
           />
 
-          {/* STATUS */}
+        ))}
 
-          {(message ||
-            error ||
-            loading) && (
+      </div>
 
-            <div className="claimStatus">
+    </section>
 
-              {loading && (
-                <div className="statusLoading">
-                  Processing claim...
-                </div>
-              )}
+    {/* ================= APPLICATION MODE ================= */}
 
-              {message &&
-                !loading && (
-                  <div className="statusSuccess">
+    <section className="modeSection">
 
-                    <FaCheckCircle />
+      <div className="sectionTitle">
 
-                    <span>
-                      {message}
-                    </span>
+        <span className="sectionBadge">
+          <FaMagic />
+          Smart Application Methods
+        </span>
 
-                  </div>
-                )}
+        <h2>Choose Application Method</h2>
 
-              {error &&
-                !loading && (
-                  <div className="statusError">
+        <p>
+          Submit insurance claims using AI Parser, Image OCR, PDF Upload,
+          or complete the smart manual application form.
+        </p>
 
-                    <span>
-                      {error}
-                    </span>
+      </div>
 
-                  </div>
-                )}
+      <div className="modeGrid">
 
-            </div>
-          )}
-
-        </section>
-      )}
-
-      {/* ======================================
-          GENERATED PDF
-      ====================================== */}
-
-      {showPdf &&
-        pdfUrl && (
-
-          <section className="generatedPdfSection">
-
-            <div className="generatedPdfHeader">
-
-              <div>
-
-                <h2>
-                  Claim PDF Generated
-                </h2>
-
-                <p>
-                  Your submitted insurance
-                  claim has been converted
-                  into a PDF document.
-                </p>
-
-                {claimNumber && (
-                  <strong>
-                    Claim Number:{" "}
-                    {claimNumber}
-                  </strong>
-                )}
-
-              </div>
-
-              <div className="pdfActionButtons">
-
-                <button
-                  type="button"
-                  className="pdfDownloadBtn"
-                  onClick={
-                    handleDownloadPDF
-                  }
-                >
-                  <FaDownload />
-                  Download PDF
-                </button>
-
-                <button
-                  type="button"
-                  className="pdfOpenBtn"
-                  onClick={
-                    handleOpenPDF
-                  }
-                >
-                  <FaEye />
-                  Open PDF
-                </button>
-
-                <button
-                  type="button"
-                  className="pdfCloseBtn"
-                  onClick={() =>
-                    setShowPdf(false)
-                  }
-                >
-                  <FaTimes />
-                </button>
-
-              </div>
-
-            </div>
-
-            <div className="pdfViewerCard">
-
-              <iframe
-                src={pdfUrl}
-                title="Forma AI Insurance Claim PDF"
-                className="claimPdfViewer"
-              />
-
-            </div>
-
-          </section>
-        )}
-
-      {/* ======================================
-          FEATURES
-      ====================================== */}
-
-      <section className="featuresSection">
-
-        <div className="sectionTitle">
-
-          <h2>
-            AI Powered Features
-          </h2>
-
-        </div>
-
-        <div className="featureGrid">
-
-          <div className="featureCard">
-
-            <FaRobot className="featureIcon" />
-
-            <h4>
-              AI Incident Parser
-            </h4>
-
-            <p>
-              Converts natural language
-              into structured insurance fields.
-            </p>
-
-          </div>
-
-          <div className="featureCard">
-
-            <FaCamera className="featureIcon" />
-
-            <h4>
-              Image OCR
-            </h4>
-
-            <p>
-              Extract text from prescriptions,
-              RC, DL and accident photos.
-            </p>
-
-          </div>
-
-          <div className="featureCard">
-
-            <FaFilePdf className="featureIcon" />
-
-            <h4>
-              PDF Extraction
-            </h4>
-
-            <p>
-              Read FIR, Hospital Bills,
-              Medical Reports and PDFs.
-            </p>
-
-          </div>
-
-          <div className="featureCard">
-
-            <FaMagic className="featureIcon" />
-
-            <h4>
-              Smart Validation
-            </h4>
-
-            <p>
-              AI validates missing information
-              before submission.
-            </p>
-
-          </div>
-
-          <div className="featureCard">
-
-            <FaCheckCircle className="featureIcon" />
-
-            <h4>
-              Confidence Score
-            </h4>
-
-            <p>
-              Every AI-generated claim receives
-              a confidence score.
-            </p>
-
-          </div>
-
-          <div className="featureCard">
-
-            <FaClipboardList className="featureIcon" />
-
-            <h4>
-              Save Draft Anytime
-            </h4>
-
-            <p>
-              Continue your insurance
-              application later.
-            </p>
-
-          </div>
-
-        </div>
-
-      </section>
-
-      {/* ======================================
-          REVIEW
-      ====================================== */}
-
-      <section className="reviewSection">
-
-        <div className="reviewCard">
-
-          <h2>
-            Review & Submit
-          </h2>
-
-          <div className="reviewGrid">
-
-            <div>
-              <span>
-                Insurance Category
-              </span>
-
-              <h4>
-                {selectedCategory.toUpperCase()}
-              </h4>
-            </div>
-
-            <div>
-              <span>
-                Application Mode
-              </span>
-
-              <h4>
-                {applicationMode.toUpperCase()}
-              </h4>
-            </div>
-
-            <div>
-              <span>
-                Applicant
-              </span>
-
-              <h4>
-                {formData.applicantName ||
-                  categoryFormData.patientName ||
-                  categoryFormData.driverName ||
-                  categoryFormData.ownerName ||
-                  categoryFormData.travelerName ||
-                  categoryFormData.policyHolderName ||
-                  "Not Filled"}
-              </h4>
-            </div>
-
-            <div>
-              <span>
-                Policy Number
-              </span>
-
-              <h4>
-                {categoryFormData.policyNumber ||
-                  formData.policyNumber ||
-                  "Not Filled"}
-              </h4>
-            </div>
-
-            <div>
-              <span>
-                Claim Status
-              </span>
-
-              <h4>
-                {claimId
-                  ? "Claim Created"
-                  : "Not Saved"}
-              </h4>
-            </div>
-
-            {claimId && (
-              <div>
-                <span>
-                  Claim ID
-                </span>
-
-                <h4>
-                  {claimId}
-                </h4>
-              </div>
-            )}
-
-            {claimNumber && (
-              <div>
-                <span>
-                  Claim Number
-                </span>
-
-                <h4>
-                  {claimNumber}
-                </h4>
-              </div>
-            )}
-
-          </div>
-
-        </div>
-
-      </section>
-
-      {/* ======================================
-          ACTION BUTTONS
-      ====================================== */}
-
-      <section className="actionSection">
-
-        <button
-          className="outlineBtn"
-          onClick={previousStep}
-          disabled={
-            loading ||
-            currentStep === 1
-          }
-          type="button"
-        >
-          Previous
-        </button>
-
-        <button
-          className="saveBtn"
-          onClick={handleSaveDraft}
-          disabled={loading}
-          type="button"
-        >
-          <FaSave />
-
-          {loading
-            ? "Saving..."
-            : "Save Draft"}
-        </button>
-
-        {currentStep < 5 && (
-          <button
-            className="nextBtn"
-            onClick={nextStep}
-            disabled={loading}
-            type="button"
-          >
-            Continue
-            <FaArrowRight />
-          </button>
-        )}
-
-        <button
-          className="submitBtn"
-          onClick={handleSubmitClaim}
-          disabled={loading}
-          type="button"
-        >
-          <FaPaperPlane />
-
-          {loading
-            ? "Submitting..."
-            : "Submit Claim"}
-        </button>
-
-      </section>
-
-      {/* ======================================
-          SMART SUGGESTIONS
-      ====================================== */}
-
-      <section className="tipsSection">
-
-        <h2>
-          Forma AI Smart Suggestions
-        </h2>
-
-        <div className="tipsGrid">
-
-          <div className="tipCard">
-            <FaRobot />
-
-            <p>
-              Upload accident photos for
-              AI damage detection.
-            </p>
-          </div>
-
-          <div className="tipCard">
-            <FaFilePdf />
-
-            <p>
-              Upload FIR or Medical Bills
-              to auto-fill claim details.
-            </p>
-          </div>
-
-          <div className="tipCard">
-            <FaCheckCircle />
-
-            <p>
-              AI checks missing information
-              before submission.
-            </p>
-          </div>
-
-          <div className="tipCard">
-            <FaHeartbeat />
-
-            <p>
-              Health insurance claims support
-              OCR prescriptions and bills.
-            </p>
-          </div>
-
-          <div className="tipCard">
-            <FaCarCrash />
-
-            <p>
-              Vehicle claims support RC,
-              DL, Police FIR and estimates.
-            </p>
-          </div>
-
-          <div className="tipCard">
-            <FaShieldAlt />
-
-            <p>
-              Life insurance claims support
-              nominee verification documents.
-            </p>
-          </div>
-
-        </div>
-
-      </section>
-
-      {/* ======================================
-          SUCCESS MODAL
-      ====================================== */}
-
-      {showSuccessModal && (
+        {/* Manual */}
 
         <div
-          className="successModalOverlay"
-          onClick={handleCloseSuccessModal}
+          className={
+            applicationMode === "manual"
+              ? "modeCard activeMode"
+              : "modeCard"
+          }
+          onClick={() => setApplicationMode("manual")}
         >
+          <FaKeyboard className="modeIcon" />
 
-          <div
-            className="successModal"
-            onClick={(event) =>
-              event.stopPropagation()
-            }
-          >
+          <h3>Manual Application</h3>
 
-            {/* SUCCESS ICON */}
+          <p>
+            Fill the intelligent insurance application manually with
+            dynamic questions.
+          </p>
 
-            <div className="successIconWrapper">
+          <span className="modeTag">Recommended</span>
 
-              <div className="successIconCircle">
+        </div>
 
-                <FaCheck />
+        {/* AI */}
 
-              </div>
+        <div
+          className={
+            applicationMode === "ai"
+              ? "modeCard activeMode"
+              : "modeCard"
+          }
+          onClick={() => setApplicationMode("ai")}
+        >
+          <FaRobot className="modeIcon" />
 
+          <h3>AI Auto Fill</h3>
+
+          <p>
+            Describe your accident or medical incident and let Gemini AI
+            fill the claim automatically.
+          </p>
+
+          <span className="modeTag">Gemini AI</span>
+
+        </div>
+
+        {/* Image OCR */}
+
+        <div
+          className={
+            applicationMode === "image"
+              ? "modeCard activeMode"
+              : "modeCard"
+          }
+          onClick={() => setApplicationMode("image")}
+        >
+          <FaCamera className="modeIcon" />
+
+          <h3>Image OCR Upload</h3>
+
+          <p>
+            Upload accident photos, RC, DL, prescriptions and bills for AI
+            extraction.
+          </p>
+
+          <span className="modeTag">OCR Vision</span>
+
+        </div>
+
+        {/* PDF */}
+
+        <div
+          className={
+            applicationMode === "pdf"
+              ? "modeCard activeMode"
+              : "modeCard"
+          }
+          onClick={() => setApplicationMode("pdf")}
+        >
+          <FaFilePdf className="modeIcon" />
+
+          <h3>PDF Upload</h3>
+
+          <p>
+            Upload FIR, hospital bills, invoices and insurance policy
+            documents.
+          </p>
+
+          <span className="modeTag">PDF Parser</span>
+
+        </div>
+
+      </div>
+
+    </section>
+
+    {/* ================= AI / IMAGE / PDF UPLOADER ================= */}
+
+    {(applicationMode === "ai" ||
+      applicationMode === "image" ||
+      applicationMode === "pdf") && (
+      <AIUploader mode={applicationMode} />
+    )}
+
+    {/* ================= MANUAL FORM ================= */}
+
+    {applicationMode === "manual" && (
+
+      <section className="manualSection">
+
+        <div className="manualHeader">
+
+          <div>
+
+            <h2>Insurance Claim Application</h2>
+
+            <p>
+              Selected Category :
+              <strong> {selectedCategory.toUpperCase()}</strong>
+            </p>
+
+          </div>
+
+          <span className="manualBadge">
+            AI Smart Validation Enabled
+          </span>
+
+        </div>
+
+        {/* Applicant Information */}
+
+        <div className="commonCard">
+
+          <h3>Applicant Information</h3>
+
+          <div className="grid2">
+
+            <div className="inputGroup">
+              <label>Applicant Name</label>
+
+              <input
+                type="text"
+                name="applicantName"
+                value={formData.applicantName}
+                onChange={handleChange}
+                placeholder="Enter Full Name"
+              />
             </div>
 
-            {/* SUCCESS CONTENT */}
+            <div className="inputGroup">
+              <label>Email Address</label>
 
-            <div className="successModalContent">
+              <input
+                type="email"
+                name="email"
+                value={formData.email}
+                onChange={handleChange}
+                placeholder="example@gmail.com"
+              />
+            </div>
 
-              <div className="successBadge">
+            <div className="inputGroup">
+              <label>Phone Number</label>
 
+              <input
+                type="tel"
+                name="phone"
+                value={formData.phone}
+                onChange={handleChange}
+                placeholder="+91 9876543210"
+              />
+            </div>
+
+            <div className="inputGroup">
+              <label>Policy Number</label>
+
+              <input
+                type="text"
+                name="policyNumber"
+                value={formData.policyNumber}
+                onChange={handleChange}
+                placeholder="POL-2026-10021"
+              />
+            </div>
+
+          </div>
+
+          <div className="inputGroup fullWidth">
+
+            <label>Claim Description</label>
+
+            <textarea
+              rows="4"
+              name="description"
+              value={formData.description}
+              onChange={handleChange}
+              placeholder="Describe the insurance incident in detail..."
+            />
+
+          </div>
+
+        </div>
+
+        {/* Dynamic Category Form */}
+
+        <ManualForm
+          category={selectedCategory}
+          onFormDataChange={handleCategoryFormData}
+        />
+
+        {/* Save Status */}
+
+        {(message || error || loading) && (
+
+          <div className="claimStatus">
+
+            {loading && (
+              <div className="statusLoading">
+                <FaClock />
+                Processing Claim...
+              </div>
+            )}
+
+            {!loading && message && (
+              <div className="statusSuccess">
                 <FaCheckCircle />
-
-                SUCCESSFUL
-
+                {message}
               </div>
+            )}
 
-              <h2>
-                Claim Submitted Successfully!
-              </h2>
-
-              <p className="successDescription">
-                Your insurance claim has been
-                successfully submitted to Forma AI.
-              </p>
-
-              {/* CLAIM NUMBER */}
-
-              <div className="successClaimBox">
-
-                <span>
-                  CLAIM NUMBER
-                </span>
-
-                <strong>
-                  {successClaimNumber ||
-                    claimNumber}
-                </strong>
-
+            {!loading && error && (
+              <div className="statusError">
+                <FaTimes />
+                {error}
               </div>
+            )}
 
-              {/* STATUS */}
+          </div>
 
-              <div className="successStatusRow">
+        )}
 
-                <div className="successStatusItem">
+      </section>
 
-                  <FaCheckCircle />
+    )}
 
-                  <div>
+    {/* ======================================
+        GENERATED CLAIM PDF
+    ====================================== */}
 
-                    <span>
-                      Submission Status
-                    </span>
+    {showPdf && pdfUrl && (
+      <section className="generatedPdfSection">
 
-                    <strong>
-                      Submitted
-                    </strong>
+        <div className="generatedPdfHeader">
 
-                  </div>
+          <div>
+            <h2>
+              <FaFilePdf /> Claim PDF Generated Successfully
+            </h2>
 
-                </div>
+            <p>
+              Your insurance claim has been submitted successfully.
+              You can preview, open, or download the generated PDF.
+            </p>
 
-                <div className="successStatusItem">
-
-                  <FaFilePdf />
-
-                  <div>
-
-                    <span>
-                      Claim Document
-                    </span>
-
-                    <strong>
-                      PDF Ready
-                    </strong>
-
-                  </div>
-
-                </div>
-
+            {claimNumber && (
+              <div className="claimNumberBadge">
+                Claim Number : <strong>{claimNumber}</strong>
               </div>
+            )}
+          </div>
 
-              <p className="successNote">
-                Your claim has been recorded
-                successfully. You can download
-                or view your claim PDF below.
-              </p>
-
-              {/* SUCCESS ACTIONS */}
-
-              <div className="successModalActions">
-
-                <button
-                  type="button"
-                  className="successPdfButton"
-                  onClick={
-                    handleSuccessViewPDF
-                  }
-                >
-                  <FaFilePdf />
-
-                  View Claim PDF
-                </button>
-
-                <button
-                  type="button"
-                  className="successOkButton"
-                  onClick={
-                    handleCloseSuccessModal
-                  }
-                >
-                  <FaCheck />
-
-                  OK
-                </button>
-
-              </div>
-
-            </div>
-
-            {/* CLOSE BUTTON */}
+          <div className="pdfActionButtons">
 
             <button
+              className="pdfDownloadBtn"
+              onClick={handleDownloadPDF}
               type="button"
-              className="successCloseButton"
-              onClick={
-                handleCloseSuccessModal
-              }
-              aria-label="Close success message"
+            >
+              <FaDownload />
+              Download PDF
+            </button>
+
+            <button
+              className="pdfOpenBtn"
+              onClick={handleOpenPDF}
+              type="button"
+            >
+              <FaEye />
+              Open PDF
+            </button>
+
+            <button
+              className="pdfCloseBtn"
+              onClick={() => setShowPdf(false)}
+              type="button"
             >
               <FaTimes />
             </button>
@@ -1797,7 +1075,433 @@ const DynamicForms = () => {
 
         </div>
 
+        <div className="pdfViewerCard">
+
+          <iframe
+            src={pdfUrl}
+            title="Forma AI Insurance Claim PDF"
+            className="claimPdfViewer"
+          />
+
+        </div>
+
+      </section>
+    )}
+
+    {/* ======================================
+        REVIEW & SUBMIT
+    ====================================== */}
+
+    <section className="reviewSection">
+
+      <div className="reviewCard">
+
+        <div className="reviewTitle">
+          <FaClipboardList />
+          <div>
+            <h2>Review Insurance Claim</h2>
+            <p>
+              Verify all information before submitting the claim to Forma AI.
+            </p>
+          </div>
+        </div>
+
+        <div className="reviewGrid">
+
+          <div className="reviewItem">
+            <span>Insurance Category</span>
+            <strong>{selectedCategory.toUpperCase()}</strong>
+          </div>
+
+          <div className="reviewItem">
+            <span>Application Mode</span>
+            <strong>{applicationMode.toUpperCase()}</strong>
+          </div>
+
+          <div className="reviewItem">
+            <span>Applicant</span>
+            <strong>
+              {formData.applicantName ||
+                categoryFormData.patientName ||
+                categoryFormData.driverName ||
+                categoryFormData.ownerName ||
+                categoryFormData.travelerName ||
+                categoryFormData.policyHolderName ||
+                "Not Filled"}
+            </strong>
+          </div>
+
+          <div className="reviewItem">
+            <span>Email</span>
+            <strong>{formData.email || "Not Filled"}</strong>
+          </div>
+
+          <div className="reviewItem">
+            <span>Phone Number</span>
+            <strong>{formData.phone || "Not Filled"}</strong>
+          </div>
+
+          <div className="reviewItem">
+            <span>Policy Number</span>
+            <strong>
+              {categoryFormData.policyNumber ||
+                formData.policyNumber ||
+                "Not Filled"}
+            </strong>
+          </div>
+
+          <div className="reviewItem">
+            <span>Claim Status</span>
+            <strong className={claimId ? "created" : "pending"}>
+              {claimId ? "Draft Created" : "Not Saved"}
+            </strong>
+          </div>
+
+          {claimNumber && (
+            <div className="reviewItem">
+              <span>Claim Number</span>
+              <strong>{claimNumber}</strong>
+            </div>
+          )}
+
+          {claimId && (
+            <div className="reviewItem full">
+              <span>Claim Database ID</span>
+              <strong>{claimId}</strong>
+            </div>
+          )}
+
+        </div>
+
+      </div>
+
+    </section>
+
+    {/* ======================================
+        ACTION BUTTONS
+    ====================================== */}
+
+    <section className="actionSection">
+
+      <button
+        className="outlineBtn"
+        onClick={previousStep}
+        disabled={loading || currentStep === 1}
+        type="button"
+      >
+        Previous
+      </button>
+
+      <button
+        className="saveBtn"
+        onClick={handleSaveDraft}
+        disabled={loading}
+        type="button"
+      >
+        <FaSave />
+
+        {loading ? "Saving..." : "Save Draft"}
+      </button>
+
+      {currentStep < 5 && (
+        <button
+          className="nextBtn"
+          onClick={nextStep}
+          disabled={loading}
+          type="button"
+        >
+          Continue
+
+          <FaArrowRight />
+        </button>
       )}
+
+      <button
+        className="submitBtn"
+        onClick={handleSubmitClaim}
+        disabled={loading}
+        type="button"
+      >
+        <FaPaperPlane />
+
+        {loading ? "Submitting..." : "Submit Claim"}
+      </button>
+
+    </section>
+
+    {/* ======================================
+        AI POWERED FEATURES
+    ====================================== */}
+
+    <section className="featuresSection">
+
+      <div className="sectionTitle">
+
+        <span className="sectionBadge">
+          <FaStar />
+          Forma AI Intelligence
+        </span>
+
+        <h2>AI Powered Features</h2>
+
+        <p>
+          Every insurance claim is enhanced using AI-powered document
+          parsing, OCR, validation, fraud detection, and smart workflow
+          automation.
+        </p>
+
+      </div>
+
+      <div className="featureGrid">
+
+        <div className="featureCard">
+
+          <FaRobot className="featureIcon" />
+
+          <h4>AI Incident Parser</h4>
+
+          <p>
+            Convert natural language descriptions into structured insurance
+            claim fields using Gemini AI.
+          </p>
+
+        </div>
+
+        <div className="featureCard">
+
+          <FaCamera className="featureIcon" />
+
+          <h4>Image OCR</h4>
+
+          <p>
+            Extract text automatically from RC books, driving licenses,
+            prescriptions, invoices and accident photos.
+          </p>
+
+        </div>
+
+        <div className="featureCard">
+
+          <FaFilePdf className="featureIcon" />
+
+          <h4>PDF Intelligence</h4>
+
+          <p>
+            Parse FIR reports, hospital bills, insurance policies and repair
+            estimates directly into claim fields.
+          </p>
+
+        </div>
+
+        <div className="featureCard">
+
+          <FaMagic className="featureIcon" />
+
+          <h4>Smart Validation</h4>
+
+          <p>
+            AI validates mandatory fields and highlights missing information
+            before submission.
+          </p>
+
+        </div>
+
+        <div className="featureCard">
+
+          <FaShieldVirus className="featureIcon" />
+
+          <h4>Fraud Detection</h4>
+
+          <p>
+            Detect suspicious claims using document consistency and AI-powered
+            anomaly detection.
+          </p>
+
+        </div>
+
+        <div className="featureCard">
+
+          <FaCheckCircle className="featureIcon" />
+
+          <h4>Confidence Score</h4>
+
+          <p>
+            Every submitted claim receives an AI confidence score for review
+            and analytics.
+          </p>
+
+        </div>
+
+      </div>
+
+    </section>
+
+    {/* ======================================
+        SMART SUGGESTIONS
+    ====================================== */}
+
+    <section className="tipsSection">
+
+      <div className="sectionTitle">
+
+        <span className="sectionBadge">
+          <FaBolt />
+          Smart Suggestions
+        </span>
+
+        <h2>Forma AI Claim Assistant</h2>
+
+        <p>
+          Improve approval chances by uploading the right supporting documents
+          for your selected insurance category.
+        </p>
+
+      </div>
+
+      <div className="tipsGrid">
+
+        <div className="tipCard">
+          <FaCarCrash />
+
+          <div>
+            <h4>Vehicle Insurance</h4>
+
+            <p>
+              Upload RC, Driving License, FIR, vehicle photos and repair
+              estimate for faster processing.
+            </p>
+          </div>
+        </div>
+
+        <div className="tipCard">
+          <FaHeartbeat />
+
+          <div>
+            <h4>Health Insurance</h4>
+
+            <p>
+              Attach hospital bills, prescriptions, discharge summary and
+              medical reports.
+            </p>
+          </div>
+        </div>
+
+        <div className="tipCard">
+          <FaHome />
+
+          <div>
+            <h4>Property Insurance</h4>
+
+            <p>
+              Upload ownership proof, damaged property images and incident
+              reports.
+            </p>
+          </div>
+        </div>
+
+        <div className="tipCard">
+          <FaPlaneDeparture />
+
+          <div>
+            <h4>Travel Insurance</h4>
+
+            <p>
+              Upload boarding pass, passport copy, baggage receipts and travel
+              tickets.
+            </p>
+          </div>
+        </div>
+
+        <div className="tipCard">
+          <FaUserShield />
+
+          <div>
+            <h4>Life Insurance</h4>
+
+            <p>
+              Attach nominee ID proof, policy certificate and required
+              supporting documents.
+            </p>
+          </div>
+        </div>
+
+      </div>
+
+    </section>
+
+    {/* ======================================
+        SUCCESS POPUP MODAL
+    ====================================== */}
+
+    {showSuccessModal && (
+      <div className="modalOverlay">
+
+        <div className="modalCard">
+
+          <div className="modalHeader">
+
+            <FaCheckCircle className="modalSuccessIcon" />
+
+            <h2>Claim Submitted Successfully!</h2>
+
+            <button
+              className="modalCloseBtn"
+              onClick={handleCloseSuccessModal}
+              type="button"
+            >
+              <FaTimes />
+            </button>
+
+          </div>
+
+          <div className="modalBody">
+
+            <p>
+              Your insurance claim has been processed and submitted. Summary of details:
+            </p>
+
+            <div className="modalDetails">
+
+              <div>
+                <span>Applicant:</span> <strong>{successApplicant}</strong>
+              </div>
+
+              <div>
+                <span>Claim Number:</span> <strong>{successClaimNumber}</strong>
+              </div>
+
+              <div>
+                <span>Submission Date:</span> <strong>{submissionDate}</strong>
+              </div>
+
+            </div>
+
+          </div>
+
+          <div className="modalFooter">
+
+            <button
+              className="secondaryBtn"
+              onClick={handleSuccessViewPDF}
+              type="button"
+            >
+              <FaEye /> View PDF
+            </button>
+
+            <button
+              className="primaryBtn"
+              onClick={handleSuccessDownloadPDF}
+              type="button"
+            >
+              <FaDownload /> Download PDF
+            </button>
+
+          </div>
+
+        </div>
+
+      </div>
+    )}
 
     </div>
   );

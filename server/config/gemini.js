@@ -2,10 +2,17 @@
 // Forma AI - Gemini Configuration
 // ==============================================
 
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenAI } from "@google/genai";
+import dotenv from "dotenv";
 
 // ==============================================
-// Get API Key
+// Load Environment Variables
+// ==============================================
+
+dotenv.config();
+
+// ==============================================
+// Get Gemini API Key
 // ==============================================
 
 const apiKey = process.env.GEMINI_API_KEY;
@@ -17,21 +24,32 @@ if (!apiKey) {
 }
 
 // ==============================================
-// Initialize Gemini
+// Initialize Gemini AI
 // ==============================================
 
-const genAI = new GoogleGenerativeAI(apiKey);
+const genAI = new GoogleGenAI({
+  apiKey,
+});
 
 // ==============================================
 // Gemini Model
 // ==============================================
+//
+// This model will be used for:
+// - PDF recognition
+// - Image recognition
+// - Insurance document extraction
+// - Claim information extraction
+// - OCR-style document understanding
+// - Structured JSON generation
+//
+// ==============================================
 
-const model = genAI.getGenerativeModel({
-  model: "gemini-3.6-flash",
-});
+export const GEMINI_MODEL =
+  process.env.GEMINI_MODEL || "gemini-2.5-flash";
 
 // ==============================================
-// Export
+// Export Gemini Client
 // ==============================================
 
-export default model;
+export default genAI;

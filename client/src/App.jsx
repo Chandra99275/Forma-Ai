@@ -1,4 +1,3 @@
-
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 
 // ================= PAGES =================
@@ -13,10 +12,24 @@ import Submissions from "./pages/Submissions";
 import Profile from "./pages/Profile";
 import Settings from "./pages/Settings";
 
+// ================= AI RECOGNITION PAGES =================
+import ImageRecognition from "./pages/ImageRecognition";
+import PDFRecognition from "./pages/PDFRecognition";
+
 // ================= 404 PAGE =================
 function NotFound() {
   return (
-    <div>
+    <div
+      style={{
+        minHeight: "100vh",
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "center",
+        alignItems: "center",
+        textAlign: "center",
+        padding: "20px",
+      }}
+    >
       <h1>404</h1>
       <h2>Page Not Found</h2>
       <p>The page you're looking for doesn't exist.</p>
@@ -62,6 +75,18 @@ function App() {
         <Route
           path="/ai-parser"
           element={<AIParser />}
+        />
+
+        {/* ================= IMAGE RECOGNITION AI ================= */}
+        <Route
+          path="/image-recognition"
+          element={<ImageRecognition />}
+        />
+
+        {/* ================= PDF RECOGNITION AI ================= */}
+        <Route
+          path="/pdf-recognition"
+          element={<PDFRecognition />}
         />
 
         {/* ================= ANALYTICS ================= */}
