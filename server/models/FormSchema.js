@@ -270,6 +270,33 @@ formSchema.pre("validate", function (next) {
     }
   });
 
+  // Prevent circular conditional dependencies.
+  const dependencies = new Map();
+
+  this.questions.forEach((question) => {
+    if (question.showIf && question.showIf.questionId) {
+      dependencies.set(question.id, question.showIf.questionId);
+    }
+  });
+
+  this.questions.forEach((question) => {
+    const visited = new Set();
+    let currentQuestionId = question.id;
+
+    while (dependencies.has(currentQuestionId)) {
+      if (visited.has(currentQuestionId)) {
+        this.invalidate(
+          "questions",
+          `Circular showIf dependency detected involving question "${question.id}".`
+        );
+        break;
+      }
+
+      visited.add(currentQuestionId);
+      currentQuestionId = dependencies.get(currentQuestionId);
+    }
+  });
+
   next();
 });
 
