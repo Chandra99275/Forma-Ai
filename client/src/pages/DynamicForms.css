@@ -704,7 +704,7 @@ button {
 .progressLineContainer {
   position: relative;
   height: 120px;
-  margin-bottom: 25px;
+  margin: 0 45px 25px;
 }
 
 .progressLine {
@@ -719,6 +719,8 @@ button {
   background: #e2e8f0;
 
   border-radius: 10px;
+
+  z-index: 1;
 }
 
 .progressLineActive {
@@ -739,19 +741,28 @@ button {
   border-radius: 10px;
 
   transition: 0.5s;
+  z-index: 2;
 }
 
 .stepWrapper {
   position: absolute;
 
+  width: 90px;
+
   transform: translateX(-50%);
 
   text-align: center;
+
+  z-index: 3;
 }
 
 .stepCircle {
   width: 52px;
   height: 52px;
+
+  margin: 0 auto;
+
+  box-sizing: border-box;
 
   border-radius: 50%;
 
@@ -767,6 +778,9 @@ button {
   font-size: 20px;
 
   transition: 0.3s;
+
+  position: relative;
+  z-index: 4;
 }
 
 .stepWrapper.active .stepCircle {
@@ -783,11 +797,14 @@ button {
 
   box-shadow:
     0 0 20px rgba(37, 99, 235, 0.35);
+
 }
 
 .stepLabel {
-  margin-top: 12px;
   width: 90px;
+  margin: 12px auto 0;
+
+  text-align: center;
 }
 
 .stepLabel h4 {
@@ -813,8 +830,12 @@ button {
 
 .miniCard {
   display: flex;
-  gap: 15px;
+  gap: 14px;
   align-items: center;
+
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
 
   padding: 18px;
 
@@ -825,6 +846,17 @@ button {
   border: 1px solid #e2e8f0;
 
   transition: 0.3s ease;
+}
+
+.miniCard > div {
+  min-width: 0;
+  flex: 1;
+}
+
+.miniCard h4,
+.miniCard p {
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .miniCard:hover {
