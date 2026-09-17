@@ -96,6 +96,33 @@ const questionSchema = new mongoose.Schema(
     options: {
       type: [String],
       default: [],
+      validate: {
+        validator: function (options) {
+          // Select questions must have at least one option.
+          if (this.type === "select" && options.length === 0) {
+            return false;
+          }
+
+          // Non-select questions should not contain options.
+          if (this.type !== "select" && options.length > 0) {
+            return false;
+          }
+
+          // Every option must contain meaningful text.
+          if (options.some((option) => option.trim() === "")) {
+            return false;
+          }
+
+          // Prevent duplicate options.
+          const normalizedOptions = options.map((option) =>
+            option.trim().toLowerCase()
+          );
+
+          return normalizedOptions.length === new Set(normalizedOptions).size;
+        },
+        message:
+          "Select questions must have unique, non-empty options, and only select questions can contain options.",
+      },
     },
 
     required: {
