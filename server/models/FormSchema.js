@@ -143,6 +143,42 @@ const questionSchema = new mongoose.Schema(
     validation: {
       type: validationSchema,
       default: () => ({}),
+      validate: {
+        validator: function (validation) {
+          if (!validation) {
+            return true;
+          }
+
+          // Text fields can use length and pattern validation.
+          if (this.type === "text" || this.type === "textarea") {
+            return (
+              validation.min === undefined &&
+              validation.max === undefined
+            );
+          }
+
+          // Number fields can use numeric range validation.
+          if (this.type === "number") {
+            return (
+              validation.minLength === undefined &&
+              validation.maxLength === undefined &&
+              validation.pattern === undefined
+            );
+          }
+
+          // Other question types should not use
+          // text-specific or numeric validation rules.
+          return (
+            validation.minLength === undefined &&
+            validation.maxLength === undefined &&
+            validation.min === undefined &&
+            validation.max === undefined &&
+            validation.pattern === undefined
+          );
+        },
+        message:
+          "Validation rules must match the question type.",
+      },
     },
 
     /*
