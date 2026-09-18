@@ -1,4 +1,5 @@
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 import {
   FaRobot,
@@ -7,7 +8,6 @@ import {
   FaCheckCircle,
   FaTimes,
   FaSearchPlus,
-  FaDownload,
   FaArrowRight,
   FaShieldAlt,
   FaBolt,
@@ -21,55 +21,48 @@ import {
   FaEye,
   FaSyncAlt,
   FaChevronRight,
+  FaFilePdf,
+  FaPaperPlane,
+  FaExternalLinkAlt,
 } from "react-icons/fa";
 
 import "./ImageRecognition.css";
 
 // ============================================================
-// FORMA AI - IMAGE RECOGNITION API
+// API CONFIGURATION
 // ============================================================
 
-// Only IMAGE files are accepted.
-// Supported:
-// JPG
-// JPEG
-// PNG
-// WEBP
-//
-// PDF is intentionally NOT supported.
+const API_BASE_URL = "http://localhost:5000/api";
 
-const API_URL =
-  "http://localhost:5000/api/recognition/extract-image";
+const RECOGNITION_API =
+  `${API_BASE_URL}/recognition/extract-image`;
 
-// Maximum image size = 10 MB
+const CLAIMS_API =
+  `${API_BASE_URL}/claims`;
+
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
 // ============================================================
-// DEFAULT EXTRACTED DATA
+// DEFAULT DATA
 // ============================================================
 
 const defaultData = {
-  // Insurance classification
   insuranceCategory: "Not detected",
   documentType: "Not detected",
 
-  // Insurance information
   insurerName: "Not detected",
   policyNumber: "Not detected",
   claimNumber: "Not detected",
 
-  // Person information
   applicant: "Not detected",
   ownerName: "Not detected",
   policyHolder: "Not detected",
 
-  // Vehicle information
   vehicle: "Not detected",
   vehicleModel: "Not detected",
   engineNumber: "Not detected",
   chassisNumber: "Not detected",
 
-  // Incident information
   incident: "Not detected",
   damage: "Not analyzed",
   location: "Not detected",
@@ -77,18 +70,15 @@ const defaultData = {
 };
 
 // ============================================================
-// IMAGE RECOGNITION COMPONENT
+// IMAGE RECOGNITION
 // ============================================================
 
 const ImageRecognition = () => {
-  // ==========================================================
-  // FILE INPUT REF
-  // ==========================================================
-
+  const navigate = useNavigate();
   const fileInputRef = useRef(null);
 
   // ==========================================================
-  // UPLOAD STATES
+  // FILE STATES
   // ==========================================================
 
   const [selectedFile, setSelectedFile] = useState(null);
@@ -101,11 +91,11 @@ const ImageRecognition = () => {
 
   const [isProcessing, setIsProcessing] = useState(false);
   const [processed, setProcessed] = useState(false);
-  const [zoom, setZoom] = useState(false);
   const [processingStep, setProcessingStep] = useState(0);
+  const [zoom, setZoom] = useState(false);
 
   // ==========================================================
-  // AI OUTPUT STATES
+  // EXTRACTION STATES
   // ==========================================================
 
   const [confidence, setConfidence] = useState("0%");
@@ -114,488 +104,32 @@ const ImageRecognition = () => {
     useState(defaultData);
 
   // ==========================================================
-  // HANDLE IMAGE FILE
+  // SUBMISSION STATES
   // ==========================================================
 
-  const handleFile = (file) => {
-    if (!file) {
-      return;
-    }
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
 
-    const allowedTypes = [
-      "image/jpeg",
-      "image/jpg",
-      "image/png",
-      "image/webp",
-    ];
+  const [claimId, setClaimId] = useState("");
+  const [claimNumber, setClaimNumber] = useState("");
 
-    // Validate file type
-    if (!allowedTypes.includes(file.type)) {
-      alert(
-        "Invalid file type.\n\n" +
-          "Forma AI accepts only:\n" +
-          "• JPG\n" +
-          "• JPEG\n" +
-          "• PNG\n" +
-          "• WEBP"
-      );
+  const [pdfUrl, setPdfUrl] = useState("");
+  const [pdfFileName, setPdfFileName] = useState("");
 
-      return;
-    }
-
-    // Validate file size
-    if (file.size > MAX_FILE_SIZE) {
-      alert(
-        "Image size is too large.\n\n" +
-          "Maximum allowed size is 10 MB."
-      );
-
-      return;
-    }
-
-    // Release previous preview URL
-    if (previewUrl) {
-      URL.revokeObjectURL(previewUrl);
-    }
-
-    // Create new preview URL
-    const newPreviewUrl = URL.createObjectURL(file);
-
-    setSelectedFile(file);
-    setPreviewUrl(newPreviewUrl);
-
-    // Reset processing state
-    setProcessed(false);
-    setIsProcessing(false);
-    setZoom(false);
-    setConfidence("0%");
-    setRawText("");
-    setProcessingStep(0);
-
-    // Reset extracted information
-    setExtractedData({
-      insuranceCategory: "Pending AI Analysis",
-      documentType: "Pending AI Analysis",
-
-      insurerName: "Pending",
-      policyNumber: "Pending",
-      claimNumber: "Pending",
-
-      applicant: "Pending",
-      ownerName: "Pending",
-      policyHolder: "Pending",
-
-      vehicle: "Pending",
-      vehicleModel: "Pending",
-      engineNumber: "Pending",
-      chassisNumber: "Pending",
-
-      incident: "Pending",
-      damage: "Pending",
-      location: "Pending",
-      date: "Pending",
-    });
-  };
+  const [errorMessage, setErrorMessage] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
 
   // ==========================================================
-  // FILE INPUT CHANGE
+  // CLEANUP PREVIEW
   // ==========================================================
 
-  const handleInputChange = (event) => {
-    const file = event.target.files?.[0];
-
-    if (file) {
-      handleFile(file);
-    }
-  };
-
-  // ==========================================================
-  // DRAG ENTER
-  // ==========================================================
-
-  const handleDragEnter = (event) => {
-    event.preventDefault();
-    event.stopPropagation();
-
-    setDragActive(true);
-  };
-
-  // ==========================================================
-  // DRAG OVER
-  // ==========================================================
-
-  const handleDragOver = (event) => {
-    event.preventDefault();
-    event.stopPropagation();
-
-    setDragActive(true);
-  };
-
-  // ==========================================================
-  // DRAG LEAVE
-  // ==========================================================
-
-  const handleDragLeave = (event) => {
-    event.preventDefault();
-    event.stopPropagation();
-
-    setDragActive(false);
-  };
-
-  // ==========================================================
-  // DROP IMAGE
-  // ==========================================================
-
-  const handleDrop = (event) => {
-    event.preventDefault();
-    event.stopPropagation();
-
-    setDragActive(false);
-
-    const files = event.dataTransfer.files;
-
-    if (!files || files.length === 0) {
-      return;
-    }
-
-    const file = files[0];
-
-    handleFile(file);
-  };
-
-  // ==========================================================
-  // OPEN FILE SELECTOR
-  // ==========================================================
-
-  const openFileSelector = () => {
-    if (fileInputRef.current) {
-      fileInputRef.current.click();
-    }
-  };
-
-  // ==========================================================
-  // GEMINI VISION PROCESSING
-  // ==========================================================
-
-  const handleProcess = async () => {
-    // Make sure an image exists
-    if (!selectedFile) {
-      alert(
-        "Please upload an insurance image before starting AI analysis."
-      );
-
-      return;
-    }
-
-    const allowedTypes = [
-      "image/jpeg",
-      "image/jpg",
-      "image/png",
-      "image/webp",
-    ];
-
-    // Safety validation
-    if (!allowedTypes.includes(selectedFile.type)) {
-      alert(
-        "Only JPG, JPEG, PNG and WEBP images can be analyzed."
-      );
-
-      return;
-    }
-
-    // File size validation
-    if (selectedFile.size > MAX_FILE_SIZE) {
-      alert("Maximum image size is 10 MB.");
-
-      return;
-    }
-
-    try {
-      // ======================================================
-      // START PROCESSING
-      // ======================================================
-
-      setIsProcessing(true);
-      setProcessed(false);
-      setProcessingStep(1);
-
-      // ======================================================
-      // CREATE FORM DATA
-      // ======================================================
-
-      const formData = new FormData();
-
-      // Backend:
-      // upload.single("document")
-
-      formData.append(
-        "document",
-        selectedFile
-      );
-
-      // ======================================================
-      // STEP 1 -> UPLOAD
-      // ======================================================
-
-      setProcessingStep(1);
-
-      await new Promise((resolve) =>
-        setTimeout(resolve, 300)
-      );
-
-      // ======================================================
-      // STEP 2 -> OCR
-      // ======================================================
-
-      setProcessingStep(2);
-
-      // ======================================================
-      // SEND IMAGE TO BACKEND
-      // ======================================================
-
-      const response = await fetch(API_URL, {
-        method: "POST",
-        body: formData,
-      });
-
-      // ======================================================
-      // READ RESPONSE
-      // ======================================================
-
-      let result;
-
-      try {
-        result = await response.json();
-      } catch (jsonError) {
-        throw new Error(
-          "The server returned an invalid response."
-        );
+  useEffect(() => {
+    return () => {
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
       }
-
-      // ======================================================
-      // CHECK SERVER RESPONSE
-      // ======================================================
-
-      if (!response.ok) {
-        throw new Error(
-          result?.message ||
-            `Recognition server returned HTTP ${response.status}.`
-        );
-      }
-
-      if (!result?.success) {
-        throw new Error(
-          result?.message ||
-            "Gemini Vision recognition failed."
-        );
-      }
-
-      // ======================================================
-      // STEP 3 -> AI EXTRACTION
-      // ======================================================
-
-      setProcessingStep(3);
-
-      const data = result?.data || {};
-
-      // ======================================================
-      // NORMALIZE AI RESPONSE
-      // ======================================================
-
-      const normalizedData = {
-        insuranceCategory:
-          data.insuranceCategory ||
-          result.insuranceCategory ||
-          data.category ||
-          result.category ||
-          "Not Found",
-
-        documentType:
-          data.documentType ||
-          result.documentType ||
-          "Insurance Document",
-
-        insurerName:
-          data.insurerName ||
-          result.insurerName ||
-          data.insuranceCompany ||
-          result.insuranceCompany ||
-          "Not Found",
-
-        policyNumber:
-          data.policyNumber ||
-          result.policyNumber ||
-          "Not Found",
-
-        claimNumber:
-          data.claimNumber ||
-          result.claimNumber ||
-          "Not Found",
-
-        applicant:
-          data.applicantName ||
-          result.applicantName ||
-          data.policyHolder ||
-          result.policyHolder ||
-          data.ownerName ||
-          result.ownerName ||
-          "Not Found",
-
-        ownerName:
-          data.ownerName ||
-          result.ownerName ||
-          data.policyHolder ||
-          result.policyHolder ||
-          "Not Found",
-
-        policyHolder:
-          data.policyHolder ||
-          result.policyHolder ||
-          data.applicantName ||
-          result.applicantName ||
-          "Not Found",
-
-        vehicle:
-          data.vehicleNumber ||
-          result.vehicleNumber ||
-          data.registrationNumber ||
-          result.registrationNumber ||
-          data.vehicleRegistrationNumber ||
-          result.vehicleRegistrationNumber ||
-          "Not Found",
-
-        vehicleModel:
-          data.vehicleModel ||
-          result.vehicleModel ||
-          data.makeAndModel ||
-          result.makeAndModel ||
-          "Not Found",
-
-        engineNumber:
-          data.engineNumber ||
-          result.engineNumber ||
-          "Not Found",
-
-        chassisNumber:
-          data.chassisNumber ||
-          result.chassisNumber ||
-          "Not Found",
-
-        incident:
-          data.incidentType ||
-          result.incidentType ||
-          data.incident ||
-          result.incident ||
-          "Not Found",
-
-        damage:
-          data.damageSummary ||
-          result.damageSummary ||
-          data.damage ||
-          result.damage ||
-          "No visible damage detected",
-
-        location:
-          data.location ||
-          result.location ||
-          data.incidentLocation ||
-          result.incidentLocation ||
-          "Not Found",
-
-        date:
-          data.incidentDate ||
-          result.incidentDate ||
-          data.dateOfIncident ||
-          result.dateOfIncident ||
-          "Not Found",
-      };
-
-      // ======================================================
-      // UPDATE UI WITH AI DATA
-      // ======================================================
-
-      setExtractedData(normalizedData);
-
-      // ======================================================
-      // OCR TEXT
-      // ======================================================
-
-      setRawText(
-        data.rawText ||
-          result.rawText ||
-          data.ocrText ||
-          result.ocrText ||
-          ""
-      );
-
-      // ======================================================
-      // CONFIDENCE
-      // ======================================================
-
-      setConfidence(
-        data.confidence ||
-          result.confidence ||
-          "98%"
-      );
-
-      // ======================================================
-      // STEP 4 -> JSON COMPLETE
-      // ======================================================
-
-      setProcessingStep(4);
-
-      await new Promise((resolve) =>
-        setTimeout(resolve, 300)
-      );
-
-      // ======================================================
-      // COMPLETE
-      // ======================================================
-
-      setProcessed(true);
-    } catch (error) {
-      console.error(
-        "Forma AI Image Recognition Error:",
-        error
-      );
-
-      alert(
-        error?.message ||
-          "AI image recognition failed. Please check your backend server and try again."
-      );
-
-      setProcessingStep(0);
-      setProcessed(false);
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  // ==========================================================
-  // CLEAR SELECTED IMAGE
-  // ==========================================================
-
-  const clearFile = () => {
-    if (previewUrl) {
-      URL.revokeObjectURL(previewUrl);
-    }
-
-    setSelectedFile(null);
-    setPreviewUrl("");
-
-    setProcessed(false);
-    setIsProcessing(false);
-    setZoom(false);
-    setConfidence("0%");
-    setRawText("");
-    setProcessingStep(0);
-
-    setExtractedData(defaultData);
-
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
-  };
+    };
+  }, [previewUrl]);
 
   // ==========================================================
   // FORMAT FILE SIZE
@@ -622,7 +156,11 @@ const ImageRecognition = () => {
   // ==========================================================
 
   const formatConfidence = (value) => {
-    if (value === null || value === undefined) {
+    if (
+      value === null ||
+      value === undefined ||
+      value === ""
+    ) {
       return "0%";
     }
 
@@ -658,76 +196,968 @@ const ImageRecognition = () => {
   };
 
   // ==========================================================
-  // EXPORT OCR RESULT
+  // NORMALIZE CATEGORY
   // ==========================================================
 
-  const exportOCRResults = () => {
-    const exportData = {
-      application: "Forma AI",
-      feature: "Gemini Vision Insurance Image Recognition",
-      confidence: formatConfidence(confidence),
-      extractedData,
-      rawText,
+  const normalizeCategory = (category) => {
+    const value = String(category || "")
+      .trim()
+      .toLowerCase();
 
-      sourceImage: selectedFile
-        ? {
-            name: selectedFile.name,
-            type: selectedFile.type,
-            size: selectedFile.size,
-          }
-        : null,
+    const allowedCategories = [
+      "health",
+      "vehicle",
+      "property",
+      "travel",
+      "life",
+    ];
 
-      generatedAt: new Date().toISOString(),
-    };
+    if (allowedCategories.includes(value)) {
+      return value;
+    }
 
-    const blob = new Blob(
-      [
-        JSON.stringify(
-          exportData,
-          null,
-          2
-        ),
-      ],
-      {
-        type: "application/json",
+    // Some Gemini responses may return these names.
+    if (
+      value.includes("car") ||
+      value.includes("auto") ||
+      value.includes("motor") ||
+      value.includes("vehicle")
+    ) {
+      return "vehicle";
+    }
+
+    if (
+      value.includes("medical") ||
+      value.includes("health")
+    ) {
+      return "health";
+    }
+
+    if (value.includes("property")) {
+      return "property";
+    }
+
+    if (value.includes("travel")) {
+      return "travel";
+    }
+
+    if (value.includes("life")) {
+      return "life";
+    }
+
+    return "";
+  };
+
+  // ==========================================================
+  // HANDLE FILE
+  // ==========================================================
+
+  const handleFile = (file) => {
+    if (!file) {
+      return;
+    }
+
+    const allowedTypes = [
+      "image/jpeg",
+      "image/jpg",
+      "image/png",
+      "image/webp",
+    ];
+
+    if (!allowedTypes.includes(file.type)) {
+      alert(
+        "Invalid file type.\n\nForma AI accepts only:\n" +
+          "• JPG\n" +
+          "• JPEG\n" +
+          "• PNG\n" +
+          "• WEBP"
+      );
+
+      return;
+    }
+
+    if (file.size > MAX_FILE_SIZE) {
+      alert(
+        "Image size is too large.\n\n" +
+          "Maximum allowed size is 10 MB."
+      );
+
+      return;
+    }
+
+    if (previewUrl) {
+      URL.revokeObjectURL(previewUrl);
+    }
+
+    const newPreviewUrl =
+      URL.createObjectURL(file);
+
+    setSelectedFile(file);
+    setPreviewUrl(newPreviewUrl);
+
+    setProcessed(false);
+    setProcessingStep(0);
+    setIsProcessing(false);
+    setZoom(false);
+
+    setConfidence("0%");
+    setRawText("");
+
+    setExtractedData({
+      insuranceCategory: "Pending AI Analysis",
+      documentType: "Pending AI Analysis",
+
+      insurerName: "Pending",
+      policyNumber: "Pending",
+      claimNumber: "Pending",
+
+      applicant: "Pending",
+      ownerName: "Pending",
+      policyHolder: "Pending",
+
+      vehicle: "Pending",
+      vehicleModel: "Pending",
+      engineNumber: "Pending",
+      chassisNumber: "Pending",
+
+      incident: "Pending",
+      damage: "Pending",
+      location: "Pending",
+      date: "Pending",
+    });
+
+    setSubmitted(false);
+
+    setClaimId("");
+    setClaimNumber("");
+    setPdfUrl("");
+    setPdfFileName("");
+
+    setErrorMessage("");
+    setSuccessMessage("");
+  };
+
+  // ==========================================================
+  // FILE INPUT
+  // ==========================================================
+
+  const handleInputChange = (event) => {
+    const file = event.target.files?.[0];
+
+    if (file) {
+      handleFile(file);
+    }
+  };
+
+  // ==========================================================
+  // DRAG EVENTS
+  // ==========================================================
+
+  const handleDragEnter = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    setDragActive(true);
+  };
+
+  const handleDragOver = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    setDragActive(true);
+  };
+
+  const handleDragLeave = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    setDragActive(false);
+  };
+
+  const handleDrop = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    setDragActive(false);
+
+    const file = event.dataTransfer.files?.[0];
+
+    if (file) {
+      handleFile(file);
+    }
+  };
+
+  // ==========================================================
+  // OPEN FILE SELECTOR
+  // ==========================================================
+
+  const openFileSelector = () => {
+    fileInputRef.current?.click();
+  };
+
+  // ==========================================================
+  // PROCESS IMAGE WITH GEMINI
+  // ==========================================================
+
+  const handleProcess = async () => {
+    setErrorMessage("");
+    setSuccessMessage("");
+
+    if (!selectedFile) {
+      setErrorMessage(
+        "Please upload an insurance image first."
+      );
+
+      return;
+    }
+
+    try {
+      setIsProcessing(true);
+      setProcessed(false);
+      setProcessingStep(1);
+
+      const formData = new FormData();
+
+      // IMPORTANT:
+      // Backend uses upload.single("document")
+      formData.append(
+        "document",
+        selectedFile
+      );
+
+      await new Promise((resolve) =>
+        setTimeout(resolve, 300)
+      );
+
+      setProcessingStep(2);
+
+      const response = await fetch(
+        RECOGNITION_API,
+        {
+          method: "POST",
+          body: formData,
+        }
+      );
+
+      let result;
+
+      try {
+        result = await response.json();
+      } catch {
+        throw new Error(
+          "Backend returned an invalid response."
+        );
       }
+
+      if (!response.ok) {
+        throw new Error(
+          result?.message ||
+            `Recognition failed with HTTP ${response.status}.`
+        );
+      }
+
+      if (!result?.success) {
+        throw new Error(
+          result?.message ||
+            "Gemini Vision recognition failed."
+        );
+      }
+
+      setProcessingStep(3);
+
+      const data = result?.data || {};
+      const resultData =
+        result?.result || {};
+
+      // ========================================================
+      // NORMALIZE RESPONSE
+      // ========================================================
+
+      const normalizedData = {
+        insuranceCategory:
+          data.insuranceCategory ||
+          resultData.insuranceCategory ||
+          result.insuranceCategory ||
+          data.category ||
+          resultData.category ||
+          result.category ||
+          "Not Found",
+
+        documentType:
+          data.documentType ||
+          resultData.documentType ||
+          result.documentType ||
+          "Insurance Document",
+
+        insurerName:
+          data.insurerName ||
+          resultData.insurerName ||
+          result.insurerName ||
+          data.insuranceCompany ||
+          resultData.insuranceCompany ||
+          "Not Found",
+
+        policyNumber:
+          data.policyNumber ||
+          resultData.policyNumber ||
+          result.policyNumber ||
+          data.insurer?.policyNumber ||
+          "Not Found",
+
+        claimNumber:
+          data.claimNumber ||
+          resultData.claimNumber ||
+          result.claimNumber ||
+          data.claim?.claimNumber ||
+          "Not Found",
+
+        applicant:
+          data.applicantName ||
+          resultData.applicantName ||
+          result.applicantName ||
+          data.applicant?.fullName ||
+          resultData.applicant?.fullName ||
+          data.policyHolder ||
+          resultData.policyHolder ||
+          data.ownerName ||
+          resultData.ownerName ||
+          "Not Found",
+
+        ownerName:
+          data.ownerName ||
+          resultData.ownerName ||
+          result.ownerName ||
+          data.applicant?.fullName ||
+          "Not Found",
+
+        policyHolder:
+          data.policyHolder ||
+          resultData.policyHolder ||
+          result.policyHolder ||
+          data.applicant?.fullName ||
+          resultData.applicant?.fullName ||
+          "Not Found",
+
+        vehicle:
+          data.vehicleNumber ||
+          resultData.vehicleNumber ||
+          result.vehicleNumber ||
+          data.registrationNumber ||
+          resultData.registrationNumber ||
+          data.vehicleRegistrationNumber ||
+          resultData.vehicleRegistrationNumber ||
+          data.vehicle?.registrationNumber ||
+          resultData.vehicle?.registrationNumber ||
+          "Not Found",
+
+        vehicleModel:
+          data.vehicleModel ||
+          resultData.vehicleModel ||
+          result.vehicleModel ||
+          data.makeAndModel ||
+          resultData.makeAndModel ||
+          data.vehicle?.make ||
+          resultData.vehicle?.make ||
+          "Not Found",
+
+        engineNumber:
+          data.engineNumber ||
+          resultData.engineNumber ||
+          result.engineNumber ||
+          "Not Found",
+
+        chassisNumber:
+          data.chassisNumber ||
+          resultData.chassisNumber ||
+          result.chassisNumber ||
+          data.vehicle?.vin ||
+          resultData.vehicle?.vin ||
+          "Not Found",
+
+        incident:
+          data.incidentType ||
+          resultData.incidentType ||
+          result.incidentType ||
+          data.incident ||
+          resultData.incident ||
+          data.claim?.claimType ||
+          resultData.claim?.claimType ||
+          "Not Found",
+
+        damage:
+          data.damageSummary ||
+          resultData.damageSummary ||
+          result.damageSummary ||
+          data.damage ||
+          resultData.damage ||
+          data.vehicle?.damageDescription ||
+          resultData.vehicle?.damageDescription ||
+          "No visible damage detected",
+
+        location:
+          data.location ||
+          resultData.location ||
+          result.location ||
+          data.incidentLocation ||
+          resultData.incidentLocation ||
+          "Not Found",
+
+        date:
+          data.incidentDate ||
+          resultData.incidentDate ||
+          result.incidentDate ||
+          data.dateOfIncident ||
+          resultData.dateOfIncident ||
+          data.dates?.incidentDate ||
+          resultData.dates?.incidentDate ||
+          "Not Found",
+      };
+
+      setExtractedData(normalizedData);
+
+      // ========================================================
+      // RAW OCR TEXT
+      // ========================================================
+
+      setRawText(
+        data.rawText ||
+          resultData.rawText ||
+          result.rawText ||
+          data.ocrText ||
+          resultData.ocrText ||
+          result.ocrText ||
+          ""
+      );
+
+      // ========================================================
+      // CONFIDENCE
+      // ========================================================
+
+      setConfidence(
+        formatConfidence(
+          data.confidence ??
+            resultData.confidence ??
+            result.confidence ??
+            98
+        )
+      );
+
+      setProcessingStep(4);
+
+      await new Promise((resolve) =>
+        setTimeout(resolve, 400)
+      );
+
+      setProcessed(true);
+
+      setSuccessMessage(
+        "Insurance document analyzed successfully. Review the extracted information and submit the claim."
+      );
+    } catch (error) {
+      console.error(
+        "Forma AI Image Recognition Error:",
+        error
+      );
+
+      setErrorMessage(
+        error?.message ||
+          "AI image recognition failed."
+      );
+
+      setProcessingStep(0);
+      setProcessed(false);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // ==========================================================
+  // SUBMIT CLAIM
+  //
+  // FLOW:
+  // 1. Create draft claim
+  // 2. Submit claim
+  // 3. Backend generates/stores PDF
+  // 4. Navigate to submissions
+  // ==========================================================
+
+  const handleSubmitClaim = async () => {
+    setErrorMessage("");
+    setSuccessMessage("");
+
+    if (!processed) {
+      setErrorMessage(
+        "Please analyze the image before submitting the claim."
+      );
+
+      return;
+    }
+
+    const category =
+      normalizeCategory(
+        extractedData.insuranceCategory
+      );
+
+    if (!category) {
+      setErrorMessage(
+        "Forma AI could not determine a valid insurance category. Please upload a clearer insurance document."
+      );
+
+      return;
+    }
+
+    if (isSubmitting) {
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+
+      // ======================================================
+      // PREPARE CLAIM DATA
+      // ======================================================
+
+      const claimData = {
+        // Original normalized fields
+        insuranceCategory:
+          category,
+
+        documentType:
+          extractedData.documentType,
+
+        insurerName:
+          extractedData.insurerName,
+
+        policyNumber:
+          extractedData.policyNumber,
+
+        claimNumber:
+          extractedData.claimNumber,
+
+        applicantName:
+          extractedData.applicant,
+
+        ownerName:
+          extractedData.ownerName,
+
+        policyHolder:
+          extractedData.policyHolder,
+
+        vehicleNumber:
+          extractedData.vehicle,
+
+        vehicleModel:
+          extractedData.vehicleModel,
+
+        engineNumber:
+          extractedData.engineNumber,
+
+        chassisNumber:
+          extractedData.chassisNumber,
+
+        incidentType:
+          extractedData.incident,
+
+        damageSummary:
+          extractedData.damage,
+
+        incidentLocation:
+          extractedData.location,
+
+        incidentDate:
+          extractedData.date,
+
+        // OCR
+        rawText,
+
+        // AI information
+        aiConfidence:
+          confidence,
+
+        source:
+          "Gemini Vision Image Recognition",
+
+        sourceFile:
+          selectedFile
+            ? {
+                name: selectedFile.name,
+                type: selectedFile.type,
+                size: selectedFile.size,
+              }
+            : null,
+      };
+
+      console.log(
+        "========================================"
+      );
+
+      console.log(
+        "FORMA AI - CREATING CLAIM"
+      );
+
+      console.log(
+        "Category:",
+        category
+      );
+
+      console.log(
+        "Claim Data:",
+        claimData
+      );
+
+      console.log(
+        "========================================"
+      );
+
+      // ======================================================
+      // STEP 1 - CREATE CLAIM
+      // ======================================================
+
+      const createResponse =
+        await fetch(
+          CLAIMS_API,
+          {
+            method: "POST",
+
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+
+            body: JSON.stringify({
+              category,
+              claimData,
+            }),
+          }
+        );
+
+      let createResult;
+
+      try {
+        createResult =
+          await createResponse.json();
+      } catch {
+        throw new Error(
+          "Claim creation returned an invalid server response."
+        );
+      }
+
+      if (!createResponse.ok) {
+        throw new Error(
+          createResult?.message ||
+            createResult?.error ||
+            `Claim creation failed with HTTP ${createResponse.status}.`
+        );
+      }
+
+      const createdClaim =
+        createResult?.claim ||
+        createResult?.data ||
+        createResult;
+
+      const newClaimId =
+        createdClaim?._id ||
+        createdClaim?.id ||
+        createResult?.claimId ||
+        createResult?.data?._id;
+
+      const newClaimNumber =
+        createdClaim?.claimNumber ||
+        createResult?.claimNumber ||
+        "";
+
+      if (!newClaimId) {
+        throw new Error(
+          "Claim was created but the backend did not return a claim ID."
+        );
+      }
+
+      setClaimId(newClaimId);
+
+      if (newClaimNumber) {
+        setClaimNumber(
+          newClaimNumber
+        );
+      }
+
+      console.log(
+        "✅ Claim created:",
+        newClaimId
+      );
+
+      // ======================================================
+      // STEP 2 - SUBMIT CLAIM
+      // ======================================================
+
+      const submitResponse =
+        await fetch(
+          `${CLAIMS_API}/${newClaimId}/submit`,
+          {
+            method: "POST",
+
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+          }
+        );
+
+      let submitResult;
+
+      try {
+        submitResult =
+          await submitResponse.json();
+      } catch {
+        throw new Error(
+          "Claim submission returned an invalid server response."
+        );
+      }
+
+      if (!submitResponse.ok) {
+        throw new Error(
+          submitResult?.message ||
+            submitResult?.error ||
+            `Claim submission failed with HTTP ${submitResponse.status}.`
+        );
+      }
+
+      const submittedClaim =
+        submitResult?.claim ||
+        submitResult?.data ||
+        submitResult;
+
+      // ======================================================
+      // GET PDF URL
+      // ======================================================
+
+      const returnedPdfUrl =
+        submittedClaim?.pdfUrl ||
+        submitResult?.pdfUrl ||
+        submitResult?.data?.pdfUrl ||
+        "";
+
+      const returnedFileName =
+        submittedClaim?.fileName ||
+        submitResult?.fileName ||
+        submitResult?.data?.fileName ||
+        "";
+
+      if (returnedPdfUrl) {
+        setPdfUrl(
+          returnedPdfUrl
+        );
+      }
+
+      if (returnedFileName) {
+        setPdfFileName(
+          returnedFileName
+        );
+      }
+
+      setSubmitted(true);
+
+      setSuccessMessage(
+        `Claim ${
+          newClaimNumber ||
+          newClaimId
+        } submitted successfully. PDF generated by the backend.`
+      );
+
+      console.log(
+        "========================================"
+      );
+
+      console.log(
+        "✅ CLAIM SUBMITTED"
+      );
+
+      console.log(
+        "Claim ID:",
+        newClaimId
+      );
+
+      console.log(
+        "Claim Number:",
+        newClaimNumber
+      );
+
+      console.log(
+        "PDF URL:",
+        returnedPdfUrl
+      );
+
+      console.log(
+        "========================================"
+      );
+
+      // ======================================================
+      // IMPORTANT:
+      // Give backend a small moment to finish writing PDF,
+      // then navigate to submissions.
+      // ======================================================
+
+      setTimeout(() => {
+        navigate(
+          "/submissions",
+          {
+            state: {
+              submittedClaimId:
+                newClaimId,
+
+              submittedClaimNumber:
+                newClaimNumber,
+
+              pdfUrl:
+                returnedPdfUrl,
+
+              message:
+                "Claim submitted successfully.",
+            },
+          }
+        );
+      }, 700);
+    } catch (error) {
+      console.error(
+        "Forma AI Claim Submission Error:",
+        error
+      );
+
+      setErrorMessage(
+        error?.message ||
+          "Unable to submit the claim."
+      );
+
+      setSubmitted(false);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // ==========================================================
+  // CLEAR IMAGE
+  // ==========================================================
+
+  const clearFile = () => {
+    if (previewUrl) {
+      URL.revokeObjectURL(previewUrl);
+    }
+
+    setSelectedFile(null);
+    setPreviewUrl("");
+
+    setProcessed(false);
+    setProcessingStep(0);
+    setIsProcessing(false);
+    setIsSubmitting(false);
+
+    setZoom(false);
+
+    setConfidence("0%");
+    setRawText("");
+
+    setExtractedData(
+      defaultData
     );
 
-    const url = URL.createObjectURL(blob);
+    setSubmitted(false);
+
+    setClaimId("");
+    setClaimNumber("");
+    setPdfUrl("");
+    setPdfFileName("");
+
+    setErrorMessage("");
+    setSuccessMessage("");
+
+    if (fileInputRef.current) {
+      fileInputRef.current.value =
+        "";
+    }
+  };
+
+  // ==========================================================
+  // PDF URL
+  // ==========================================================
+
+  const getFullPdfUrl = () => {
+    if (!pdfUrl) {
+      return "";
+    }
+
+    if (
+      pdfUrl.startsWith(
+        "http://"
+      ) ||
+      pdfUrl.startsWith(
+        "https://"
+      )
+    ) {
+      return pdfUrl;
+    }
+
+    return `http://localhost:5000${pdfUrl}`;
+  };
+
+  // ==========================================================
+  // OPEN PDF
+  // ==========================================================
+
+  const openPDF = () => {
+    const url =
+      getFullPdfUrl();
+
+    if (!url) {
+      setErrorMessage(
+        "PDF is not available."
+      );
+
+      return;
+    }
+
+    window.open(
+      url,
+      "_blank",
+      "noopener,noreferrer"
+    );
+  };
+
+  // ==========================================================
+  // DOWNLOAD PDF
+  // ==========================================================
+
+  const downloadPDF = () => {
+    const url =
+      getFullPdfUrl();
+
+    if (!url) {
+      setErrorMessage(
+        "PDF is not available yet."
+      );
+
+      return;
+    }
 
     const anchor =
-      document.createElement("a");
+      document.createElement(
+        "a"
+      );
 
     anchor.href = url;
 
     anchor.download =
-      "forma-ai-insurance-ocr-results.json";
+      pdfFileName ||
+      `forma-ai-${claimNumber || claimId}.pdf`;
 
-    document.body.appendChild(anchor);
+    anchor.target = "_blank";
+
+    document.body.appendChild(
+      anchor
+    );
 
     anchor.click();
 
-    document.body.removeChild(anchor);
-
-    URL.revokeObjectURL(url);
-  };
-
-  // ==========================================================
-  // USE OCR DATA IN CLAIM
-  // ==========================================================
-
-  const handleUseInClaim = () => {
-    console.log(
-      "Forma AI OCR Output:",
-      {
-        confidence,
-        rawText,
-        extractedData,
-      }
-    );
-
-    alert(
-      "OCR data is ready to be used in Forma AI Claim Creation."
+    document.body.removeChild(
+      anchor
     );
   };
 
@@ -738,33 +1168,27 @@ const ImageRecognition = () => {
   return (
     <div className="image-recognition-page">
 
-      {/* =====================================================
-          BACKGROUND EFFECTS
-      ====================================================== */}
+      {/* ====================================================
+          BACKGROUND
+      ===================================================== */}
 
       <div className="ir-background-orb ir-orb-one"></div>
-
       <div className="ir-background-orb ir-orb-two"></div>
-
       <div className="ir-background-grid"></div>
 
-
-      {/* =====================================================
+      {/* ====================================================
           HEADER
-      ====================================================== */}
+      ===================================================== */}
 
       <header className="ir-header">
 
         <div className="ir-header-left">
 
           <div className="ir-page-icon">
-
             <FaImage />
 
             <span className="ir-icon-pulse"></span>
-
           </div>
-
 
           <div>
 
@@ -782,32 +1206,22 @@ const ImageRecognition = () => {
 
             </div>
 
-
             <h1>
-
               Gemini Vision OCR{" "}
-
               <span>
                 Forma AI
               </span>
-
             </h1>
 
-
             <p>
-
-              Upload insurance document images, policy images,
-              Aadhaar, PAN, RC, DL or accident photos and extract
-              structured insurance information using Gemini 2.5 Flash Vision.
-
+              Upload an insurance document image and
+              extract structured insurance information
+              using Gemini Vision AI.
             </p>
 
           </div>
 
         </div>
-
-
-        {/* Gemini Status */}
 
         <div className="ir-header-status">
 
@@ -819,27 +1233,19 @@ const ImageRecognition = () => {
 
       </header>
 
-
-      {/* =====================================================
-          AI CAPABILITY STRIP
-      ====================================================== */}
+      {/* ====================================================
+          CAPABILITY STRIP
+      ===================================================== */}
 
       <section className="ir-capability-strip">
-
-
-        {/* OCR */}
 
         <div className="ir-capability">
 
           <div className="ir-capability-icon">
-
             <FaBrain />
-
           </div>
 
-
           <div>
-
             <strong>
               OCR Recognition
             </strong>
@@ -847,28 +1253,19 @@ const ImageRecognition = () => {
             <span>
               Reads visible text from insurance images.
             </span>
-
           </div>
 
         </div>
 
-
         <div className="ir-capability-divider"></div>
-
-
-        {/* Insurance Extraction */}
 
         <div className="ir-capability">
 
           <div className="ir-capability-icon">
-
             <FaMagic />
-
           </div>
 
-
           <div>
-
             <strong>
               Insurance Extraction
             </strong>
@@ -876,92 +1273,147 @@ const ImageRecognition = () => {
             <span>
               Policy, Claim, Applicant, Vehicle and Damage.
             </span>
-
           </div>
 
         </div>
 
-
         <div className="ir-capability-divider"></div>
-
-
-        {/* Gemini Vision */}
 
         <div className="ir-capability">
 
           <div className="ir-capability-icon">
-
             <FaShieldAlt />
-
           </div>
 
-
           <div>
-
             <strong>
               Gemini Vision AI
             </strong>
 
             <span>
-              Image + OCR + JSON Insurance Analysis.
+              Image + OCR + structured analysis.
             </span>
-
           </div>
 
         </div>
 
-
         <div className="ir-capability-divider"></div>
-
-
-        {/* Fast Processing */}
 
         <div className="ir-capability">
 
           <div className="ir-capability-icon">
-
             <FaBolt />
-
           </div>
 
-
           <div>
-
             <strong>
-              Fast AI Processing
+              Fast Processing
             </strong>
 
             <span>
-              Powered by Gemini 2.5 Flash.
+              AI-powered insurance recognition.
             </span>
-
           </div>
 
         </div>
 
       </section>
 
+      {/* ====================================================
+          ERROR MESSAGE
+      ===================================================== */}
 
-      {/* =====================================================
+      {errorMessage && (
+
+        <div
+          style={{
+            margin:
+              "20px auto 0",
+            maxWidth:
+              "1400px",
+            padding:
+              "14px 18px",
+            borderRadius:
+              "12px",
+            background:
+              "rgba(220, 38, 38, 0.08)",
+            border:
+              "1px solid rgba(220, 38, 38, 0.2)",
+            color:
+              "#dc2626",
+            display:
+              "flex",
+            alignItems:
+              "center",
+            gap:
+              "10px",
+          }}
+        >
+
+          <FaTimes />
+
+          <span>
+            {errorMessage}
+          </span>
+
+        </div>
+
+      )}
+
+      {/* ====================================================
+          SUCCESS MESSAGE
+      ===================================================== */}
+
+      {successMessage && (
+
+        <div
+          style={{
+            margin:
+              "20px auto 0",
+            maxWidth:
+              "1400px",
+            padding:
+              "14px 18px",
+            borderRadius:
+              "12px",
+            background:
+              "rgba(16, 185, 129, 0.08)",
+            border:
+              "1px solid rgba(16, 185, 129, 0.2)",
+            color:
+              "#059669",
+            display:
+              "flex",
+            alignItems:
+              "center",
+            gap:
+              "10px",
+          }}
+        >
+
+          <FaCheckCircle />
+
+          <span>
+            {successMessage}
+          </span>
+
+        </div>
+
+      )}
+
+      {/* ====================================================
           MAIN WORKSPACE
-      ====================================================== */}
+      ===================================================== */}
 
       <main className="ir-workspace">
 
-
-        {/* ===================================================
+        {/* ==================================================
             LEFT PANEL
-        ==================================================== */}
+        =================================================== */}
 
         <section className="ir-upload-panel">
 
-
-          {/* =================================================
-              PANEL HEADER
-          ================================================== */}
-
           <div className="ir-panel-heading">
-
 
             <div>
 
@@ -969,24 +1421,17 @@ const ImageRecognition = () => {
                 UPLOAD INSURANCE IMAGE
               </span>
 
-
               <h2>
                 AI Image Recognition
               </h2>
 
-
               <p>
-
-                Supported Images:
-                Insurance Policy • Claim Document • RC • DL •
-                Aadhaar • PAN • Accident Photo • Vehicle Damage
-
+                Upload an insurance policy,
+                claim document, RC, DL,
+                Aadhaar, PAN or accident image.
               </p>
 
             </div>
-
-
-            {/* Secure Badge */}
 
             <div className="ir-secure-badge">
 
@@ -998,10 +1443,9 @@ const ImageRecognition = () => {
 
           </div>
 
-
-          {/* =================================================
-              IMAGE UPLOAD AREA
-          ================================================== */}
+          {/* ==================================================
+              DROPZONE
+          =================================================== */}
 
           {!selectedFile ? (
 
@@ -1011,57 +1455,54 @@ const ImageRecognition = () => {
                   ? "ir-dropzone-active"
                   : ""
               }`}
-              onDragEnter={handleDragEnter}
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-              onDrop={handleDrop}
-              onClick={openFileSelector}
+              onDragEnter={
+                handleDragEnter
+              }
+              onDragOver={
+                handleDragOver
+              }
+              onDragLeave={
+                handleDragLeave
+              }
+              onDrop={
+                handleDrop
+              }
+              onClick={
+                openFileSelector
+              }
             >
 
-              {/* Hidden File Input */}
-
               <input
-                ref={fileInputRef}
+                ref={
+                  fileInputRef
+                }
                 hidden
                 type="file"
                 accept="image/png,image/jpeg,image/jpg,image/webp"
-                onChange={handleInputChange}
+                onChange={
+                  handleInputChange
+                }
               />
-
-
-              {/* Upload Animation */}
 
               <div className="ir-upload-animation">
 
                 <div className="ir-upload-ring ring-one"></div>
-
                 <div className="ir-upload-ring ring-two"></div>
 
                 <div className="ir-upload-icon">
-
                   <FaCloudUploadAlt />
-
                 </div>
 
               </div>
-
-
-              {/* Upload Title */}
 
               <h3>
                 Drop Insurance Image Here
               </h3>
 
-
               <p>
-
-                Click or drag an insurance document image,
-                policy image or accident photo into this area.
-
+                Click or drag an insurance document
+                image or accident photo here.
               </p>
-
-
-              {/* Supported Image Types */}
 
               <div className="ir-supported">
 
@@ -1082,13 +1523,10 @@ const ImageRecognition = () => {
                 </span>
 
                 <em>
-                  Images Only • Maximum 10 MB
+                  Maximum 10 MB
                 </em>
 
               </div>
-
-
-              {/* Choose File Button */}
 
               <div className="ir-upload-button">
 
@@ -1098,46 +1536,21 @@ const ImageRecognition = () => {
 
               </div>
 
-
-              <div
-                style={{
-                  marginTop: "16px",
-                  fontSize: "12px",
-                  opacity: 0.7,
-                  textAlign: "center",
-                }}
-              >
-
-                Only image files are accepted.
-                PDF and other document formats are disabled.
-
-              </div>
-
             </div>
 
           ) : (
 
-            /* Image Selected */
-
             <div className="ir-preview-wrapper">
-
 
               {/* Preview Header */}
 
               <div className="ir-preview-header">
 
-
-                {/* File Information */}
-
                 <div className="ir-file-info">
 
-
                   <div className="ir-file-icon">
-
                     <FaImage />
-
                   </div>
-
 
                   <div>
 
@@ -1145,13 +1558,11 @@ const ImageRecognition = () => {
                       {selectedFile.name}
                     </strong>
 
-
                     <span>
                       {formatFileSize(
                         selectedFile.size
                       )}
                     </span>
-
 
                     <small>
                       {selectedFile.type}
@@ -1161,29 +1572,23 @@ const ImageRecognition = () => {
 
                 </div>
 
-
-                {/* Remove Button */}
-
                 <button
                   className="ir-remove-button"
-                  onClick={clearFile}
+                  onClick={
+                    clearFile
+                  }
                   type="button"
-                  aria-label="Remove image"
                 >
-
                   <FaTimes />
-
                 </button>
 
               </div>
 
-
-              {/* Image Preview Area */}
+              {/* Image */}
 
               <div className="ir-image-preview">
 
-
-                {previewUrl ? (
+                {previewUrl && (
 
                   <img
                     src={previewUrl}
@@ -1195,36 +1600,7 @@ const ImageRecognition = () => {
                     }
                   />
 
-                ) : (
-
-                  <div
-                    style={{
-                      padding: "40px",
-                      textAlign: "center",
-                    }}
-                  >
-
-                    <FaImage
-                      style={{
-                        fontSize: "50px",
-                        marginBottom: "15px",
-                      }}
-                    />
-
-                    <h3>
-                      Image Preview Unavailable
-                    </h3>
-
-                    <p>
-                      Please select the image again.
-                    </p>
-
-                  </div>
-
                 )}
-
-
-                {/* Image Preview Controls */}
 
                 {previewUrl && (
 
@@ -1233,7 +1609,9 @@ const ImageRecognition = () => {
                     <button
                       type="button"
                       onClick={() =>
-                        setZoom(!zoom)
+                        setZoom(
+                          !zoom
+                        )
                       }
                     >
 
@@ -1251,11 +1629,7 @@ const ImageRecognition = () => {
 
               </div>
 
-
-              {/* Image Preview Footer */}
-
               <div className="ir-preview-footer">
-
 
                 <div className="ir-image-status">
 
@@ -1265,67 +1639,69 @@ const ImageRecognition = () => {
 
                 </div>
 
-
                 <button
                   type="button"
                   className="ir-change-button"
-                  onClick={openFileSelector}
+                  onClick={
+                    openFileSelector
+                  }
                 >
-
                   Change Image
-
                 </button>
 
-
-                {/* Hidden Input */}
-
                 <input
-                  ref={fileInputRef}
+                  ref={
+                    fileInputRef
+                  }
                   hidden
                   type="file"
                   accept="image/png,image/jpeg,image/jpg,image/webp"
-                  onChange={handleInputChange}
+                  onChange={
+                    handleInputChange
+                  }
                 />
 
               </div>
-
 
             </div>
 
           )}
 
-
-          {/* =====================================================
-              IMAGE VALIDATION INFORMATION
-          ====================================================== */}
+          {/* Validation */}
 
           {selectedFile && (
 
             <div
               style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "8px",
-                marginTop: "12px",
-                fontSize: "12px",
-                opacity: 0.75,
+                display:
+                  "flex",
+                alignItems:
+                  "center",
+                gap:
+                  "8px",
+                marginTop:
+                  "12px",
+                fontSize:
+                  "12px",
+                opacity:
+                  0.75,
               }}
             >
 
               <FaCheckCircle />
 
-              Image validated successfully •
-              {formatFileSize(selectedFile.size)} •
-              Ready for AI analysis
+              Image validated successfully •{" "}
+              {formatFileSize(
+                selectedFile.size
+              )}
 
             </div>
 
           )}
 
-
-          {/* =====================================================
+          {/* ==================================================
               ANALYZE BUTTON
-          ====================================================== */}
+          =================================================== */}
 
           <button
             type="button"
@@ -1336,15 +1712,17 @@ const ImageRecognition = () => {
             }`}
             disabled={
               !selectedFile ||
-              isProcessing
+              isProcessing ||
+              isSubmitting
             }
-            onClick={handleProcess}
+            onClick={
+              handleProcess
+            }
           >
 
             {isProcessing ? (
 
               <>
-
                 <FaSyncAlt className="ir-spin" />
 
                 Analyzing with Gemini Vision...
@@ -1354,7 +1732,6 @@ const ImageRecognition = () => {
             ) : (
 
               <>
-
                 <FaRobot />
 
                 Analyze with Forma AI
@@ -1367,15 +1744,13 @@ const ImageRecognition = () => {
 
           </button>
 
-
-          {/* =====================================================
+          {/* ==================================================
               PROCESSING STATUS
-          ====================================================== */}
+          =================================================== */}
 
           {isProcessing && (
 
             <div className="ir-processing-box">
-
 
               <div className="ir-processing-title">
 
@@ -1387,25 +1762,22 @@ const ImageRecognition = () => {
 
               </div>
 
-
               <p
                 style={{
-                  margin: "8px 0 18px",
-                  fontSize: "13px",
-                  opacity: 0.7,
+                  margin:
+                    "8px 0 18px",
+                  fontSize:
+                    "13px",
+                  opacity:
+                    0.7,
                 }}
               >
-
-                Gemini is analyzing the uploaded insurance
-                image and extracting structured information.
-
+                Gemini is analyzing the uploaded
+                insurance image and extracting
+                structured information.
               </p>
 
-
-              {/* Processing Steps */}
-
               <div className="ir-processing-steps">
-
 
                 <div
                   className={
@@ -1414,15 +1786,11 @@ const ImageRecognition = () => {
                       : "ir-step"
                   }
                 >
-
                   <span>
                     01
                   </span>
-
                   Uploading Image
-
                 </div>
-
 
                 <div
                   className={
@@ -1431,15 +1799,11 @@ const ImageRecognition = () => {
                       : "ir-step"
                   }
                 >
-
                   <span>
                     02
                   </span>
-
-                  Reading Visible Text (OCR)
-
+                  Reading Visible Text
                 </div>
-
 
                 <div
                   className={
@@ -1448,15 +1812,11 @@ const ImageRecognition = () => {
                       : "ir-step"
                   }
                 >
-
                   <span>
                     03
                   </span>
-
-                  AI Extracting Insurance Fields
-
+                  AI Extracting Fields
                 </div>
-
 
                 <div
                   className={
@@ -1465,15 +1825,11 @@ const ImageRecognition = () => {
                       : "ir-step"
                   }
                 >
-
                   <span>
                     04
                   </span>
-
-                  Returning Structured JSON
-
+                  Extraction Complete
                 </div>
-
 
               </div>
 
@@ -1481,60 +1837,15 @@ const ImageRecognition = () => {
 
           )}
 
-
-          {/* =====================================================
-              IMAGE INPUT REQUIREMENTS
-          ====================================================== */}
-
-          <div
-            style={{
-              marginTop: "18px",
-              padding: "14px 16px",
-              borderRadius: "12px",
-              fontSize: "12px",
-              lineHeight: "1.6",
-            }}
-          >
-
-            <strong>
-              Image Recognition Requirements
-            </strong>
-
-            <br />
-
-            Use a clear, well-lit image where policy numbers,
-            names, vehicle registration numbers and other
-            insurance information are readable.
-
-            <br />
-
-            Supported:
-            JPG • JPEG • PNG • WEBP
-
-            <br />
-
-            Maximum:
-            10 MB
-
-          </div>
-
-
         </section>
 
-
-        {/* ===================================================
+        {/* ==================================================
             RIGHT PANEL
-        ==================================================== */}
+        =================================================== */}
 
         <section className="ir-results-panel">
 
-
-          {/* =================================================
-              RESULTS PANEL HEADER
-          ================================================== */}
-
           <div className="ir-panel-heading">
-
 
             <div>
 
@@ -1542,21 +1853,16 @@ const ImageRecognition = () => {
                 AI OCR OUTPUT
               </span>
 
-
               <h2>
                 Recognition Results
               </h2>
 
-
               <p>
-                Insurance information extracted from
-                your uploaded image.
+                Review the extracted insurance
+                information before submitting.
               </p>
 
             </div>
-
-
-            {/* Confidence Badge */}
 
             {processed && (
 
@@ -1564,7 +1870,10 @@ const ImageRecognition = () => {
 
                 <FaCheckCircle />
 
-                {formatConfidence(confidence)}
+                {formatConfidence(
+                  confidence
+                )}
+
                 {" "}Confidence
 
               </div>
@@ -1573,90 +1882,57 @@ const ImageRecognition = () => {
 
           </div>
 
-
-          {/* =================================================
-              EMPTY RESULTS / PROCESSED RESULTS
-          ================================================== */}
+          {/* ==================================================
+              EMPTY STATE
+          =================================================== */}
 
           {!processed ? (
 
             <div className="ir-empty-results">
-
-
-              {/* AI Orbit */}
 
               <div className="ir-empty-orbit">
 
                 <div className="ir-orbit-ring"></div>
 
                 <div className="ir-empty-icon">
-
                   <FaBrain />
-
                 </div>
 
               </div>
-
-
-              {/* Empty State Title */}
 
               <h3>
                 Waiting for AI Recognition
               </h3>
 
-
               <p>
-
                 Upload an insurance image and click
                 "Analyze with Forma AI" to extract
                 insurance information.
-
               </p>
-
-
-              {/* Empty Features */}
 
               <div className="ir-empty-features">
 
-
                 <span>
-
                   <FaCheckCircle />
-
                   Insurance Category Detection
-
                 </span>
 
-
                 <span>
-
                   <FaCheckCircle />
-
                   Policy & Claim Information
-
                 </span>
 
-
                 <span>
-
                   <FaCheckCircle />
-
                   Vehicle Information
-
                 </span>
-
 
                 <span>
-
                   <FaCheckCircle />
-
                   OCR Text Extraction
-
                 </span>
-
 
               </div>
-
 
             </div>
 
@@ -1664,24 +1940,22 @@ const ImageRecognition = () => {
 
             <div className="ir-results-content">
 
-
-              {/* =====================================================
-                  CONFIDENCE CARD
-              ====================================================== */}
+              {/* ==================================================
+                  CONFIDENCE
+              =================================================== */}
 
               <div className="ir-confidence-card">
 
                 <div className="ir-confidence-main">
-
-
-                  {/* Confidence Circle */}
 
                   <div className="ir-confidence-circle">
 
                     <div>
 
                       <strong>
-                        {formatConfidence(confidence)}
+                        {formatConfidence(
+                          confidence
+                        )}
                       </strong>
 
                       <span>
@@ -1692,31 +1966,20 @@ const ImageRecognition = () => {
 
                   </div>
 
-
-                  {/* Confidence Information */}
-
                   <div>
 
                     <span className="ir-confidence-label">
-
                       GEMINI OCR COMPLETE
-
                     </span>
 
-
                     <h3>
-
                       Insurance Image Successfully Processed
-
                     </h3>
 
-
                     <p>
-
-                      Forma AI extracted structured insurance
-                      information and complete readable OCR text
-                      from the uploaded image.
-
+                      Forma AI extracted structured
+                      insurance information from the
+                      uploaded image.
                     </p>
 
                   </div>
@@ -1725,104 +1988,114 @@ const ImageRecognition = () => {
 
               </div>
 
-
-              {/* =====================================================
-                  INSURANCE CATEGORY HIGHLIGHT
-              ====================================================== */}
+              {/* ==================================================
+                  CATEGORY
+              =================================================== */}
 
               <div
                 className="ir-category-highlight"
                 style={{
-                  marginTop: "20px",
-                  padding: "22px",
-                  borderRadius: "18px",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  gap: "20px",
+                  marginTop:
+                    "20px",
+                  padding:
+                    "22px",
+                  borderRadius:
+                    "18px",
+                  display:
+                    "flex",
+                  alignItems:
+                    "center",
+                  justifyContent:
+                    "space-between",
+                  gap:
+                    "20px",
                 }}
               >
 
                 <div
                   style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "15px",
+                    display:
+                      "flex",
+                    alignItems:
+                      "center",
+                    gap:
+                      "15px",
                   }}
                 >
 
                   <div
                     className="ir-data-icon"
                     style={{
-                      width: "52px",
-                      height: "52px",
+                      width:
+                        "52px",
+                      height:
+                        "52px",
                     }}
                   >
-
                     <FaShieldAlt />
-
                   </div>
-
 
                   <div>
 
                     <span
                       style={{
-                        display: "block",
-                        fontSize: "11px",
-                        letterSpacing: "1.5px",
-                        fontWeight: "700",
-                        opacity: 0.65,
+                        display:
+                          "block",
+                        fontSize:
+                          "11px",
+                        letterSpacing:
+                          "1.5px",
+                        fontWeight:
+                          "700",
+                        opacity:
+                          0.65,
                       }}
                     >
-
                       DETECTED INSURANCE CATEGORY
-
                     </span>
-
 
                     <strong
                       style={{
-                        display: "block",
-                        marginTop: "5px",
-                        fontSize: "20px",
+                        display:
+                          "block",
+                        marginTop:
+                          "5px",
+                        fontSize:
+                          "20px",
                       }}
                     >
-
-                      {extractedData.insuranceCategory}
-
+                      {
+                        extractedData.insuranceCategory
+                      }
                     </strong>
 
                   </div>
 
                 </div>
 
-
                 <div
                   style={{
-                    fontSize: "12px",
-                    opacity: 0.65,
-                    textAlign: "right",
-                    maxWidth: "260px",
+                    fontSize:
+                      "12px",
+                    opacity:
+                      0.65,
+                    textAlign:
+                      "right",
+                    maxWidth:
+                      "260px",
                   }}
                 >
-
-                  Gemini Vision automatically classified
-                  the insurance image.
-
+                  Gemini Vision automatically
+                  classified the insurance image.
                 </div>
 
               </div>
 
-
-              {/* =====================================================
-                  EXTRACTED INFORMATION SECTION
-              ====================================================== */}
+              {/* ==================================================
+                  EXTRACTED DATA
+              =================================================== */}
 
               <div className="ir-data-section">
-
-
-                {/* Section Header */}
 
                 <div className="ir-data-heading">
 
@@ -1832,61 +2105,25 @@ const ImageRecognition = () => {
                       INSURANCE CLAIM INFORMATION
                     </span>
 
-
                     <h3>
                       AI Extracted Fields
                     </h3>
 
                   </div>
 
-
                   <FaBrain />
 
                 </div>
 
-
-                {/* Data Grid */}
-
                 <div className="ir-data-grid">
-
-
-                  {/* Insurance Category */}
-
-                  <div className="ir-data-card">
-
-                    <div className="ir-data-icon">
-
-                      <FaShieldAlt />
-
-                    </div>
-
-
-                    <div>
-
-                      <span>
-                        Insurance Category
-                      </span>
-
-
-                      <strong>
-                        {extractedData.insuranceCategory}
-                      </strong>
-
-                    </div>
-
-                  </div>
-
 
                   {/* Document Type */}
 
                   <div className="ir-data-card">
 
                     <div className="ir-data-icon">
-
                       <FaFileAlt />
-
                     </div>
-
 
                     <div>
 
@@ -1894,26 +2131,23 @@ const ImageRecognition = () => {
                         Document Type
                       </span>
 
-
                       <strong>
-                        {extractedData.documentType}
+                        {
+                          extractedData.documentType
+                        }
                       </strong>
 
                     </div>
 
                   </div>
 
-
                   {/* Insurance Company */}
 
                   <div className="ir-data-card">
 
                     <div className="ir-data-icon">
-
                       <FaShieldAlt />
-
                     </div>
-
 
                     <div>
 
@@ -1921,26 +2155,23 @@ const ImageRecognition = () => {
                         Insurance Company
                       </span>
 
-
                       <strong>
-                        {extractedData.insurerName}
+                        {
+                          extractedData.insurerName
+                        }
                       </strong>
 
                     </div>
 
                   </div>
 
-
                   {/* Policy Number */}
 
                   <div className="ir-data-card">
 
                     <div className="ir-data-icon">
-
                       <FaFileAlt />
-
                     </div>
-
 
                     <div>
 
@@ -1948,26 +2179,23 @@ const ImageRecognition = () => {
                         Policy Number
                       </span>
 
-
                       <strong>
-                        {extractedData.policyNumber}
+                        {
+                          extractedData.policyNumber
+                        }
                       </strong>
 
                     </div>
 
                   </div>
 
-
                   {/* Claim Number */}
 
                   <div className="ir-data-card">
 
                     <div className="ir-data-icon">
-
                       <FaFileAlt />
-
                     </div>
-
 
                     <div>
 
@@ -1975,26 +2203,23 @@ const ImageRecognition = () => {
                         Claim Number
                       </span>
 
-
                       <strong>
-                        {extractedData.claimNumber}
+                        {
+                          extractedData.claimNumber
+                        }
                       </strong>
 
                     </div>
 
                   </div>
 
-
                   {/* Policy Holder */}
 
                   <div className="ir-data-card">
 
                     <div className="ir-data-icon">
-
                       <FaUser />
-
                     </div>
-
 
                     <div>
 
@@ -2002,26 +2227,23 @@ const ImageRecognition = () => {
                         Policy Holder
                       </span>
 
-
                       <strong>
-                        {extractedData.policyHolder}
+                        {
+                          extractedData.policyHolder
+                        }
                       </strong>
 
                     </div>
 
                   </div>
 
-
-                  {/* Applicant Name */}
+                  {/* Applicant */}
 
                   <div className="ir-data-card">
 
                     <div className="ir-data-icon">
-
                       <FaUser />
-
                     </div>
-
 
                     <div>
 
@@ -2029,26 +2251,23 @@ const ImageRecognition = () => {
                         Applicant Name
                       </span>
 
-
                       <strong>
-                        {extractedData.applicant}
+                        {
+                          extractedData.applicant
+                        }
                       </strong>
 
                     </div>
 
                   </div>
 
-
-                  {/* Owner Name */}
+                  {/* Owner */}
 
                   <div className="ir-data-card">
 
                     <div className="ir-data-icon">
-
                       <FaUser />
-
                     </div>
-
 
                     <div>
 
@@ -2056,26 +2275,23 @@ const ImageRecognition = () => {
                         Owner Name
                       </span>
 
-
                       <strong>
-                        {extractedData.ownerName}
+                        {
+                          extractedData.ownerName
+                        }
                       </strong>
 
                     </div>
 
                   </div>
 
-
                   {/* Vehicle Number */}
 
                   <div className="ir-data-card">
 
                     <div className="ir-data-icon">
-
                       <FaCar />
-
                     </div>
-
 
                     <div>
 
@@ -2083,26 +2299,23 @@ const ImageRecognition = () => {
                         Vehicle Registration Number
                       </span>
 
-
                       <strong>
-                        {extractedData.vehicle}
+                        {
+                          extractedData.vehicle
+                        }
                       </strong>
 
                     </div>
 
                   </div>
 
-
                   {/* Vehicle Model */}
 
                   <div className="ir-data-card">
 
                     <div className="ir-data-icon">
-
                       <FaCar />
-
                     </div>
-
 
                     <div>
 
@@ -2110,26 +2323,23 @@ const ImageRecognition = () => {
                         Vehicle Make & Model
                       </span>
 
-
                       <strong>
-                        {extractedData.vehicleModel}
+                        {
+                          extractedData.vehicleModel
+                        }
                       </strong>
 
                     </div>
 
                   </div>
 
-
-                  {/* Engine Number */}
+                  {/* Engine */}
 
                   <div className="ir-data-card">
 
                     <div className="ir-data-icon">
-
                       <FaCar />
-
                     </div>
-
 
                     <div>
 
@@ -2137,53 +2347,47 @@ const ImageRecognition = () => {
                         Engine Number
                       </span>
 
-
                       <strong>
-                        {extractedData.engineNumber}
+                        {
+                          extractedData.engineNumber
+                        }
                       </strong>
 
                     </div>
 
                   </div>
 
-
-                  {/* Chassis Number */}
+                  {/* Chassis */}
 
                   <div className="ir-data-card">
 
                     <div className="ir-data-icon">
-
                       <FaCar />
-
                     </div>
-
 
                     <div>
 
                       <span>
-                        Chassis Number
+                        Chassis / VIN
                       </span>
 
-
                       <strong>
-                        {extractedData.chassisNumber}
+                        {
+                          extractedData.chassisNumber
+                        }
                       </strong>
 
                     </div>
 
                   </div>
 
-
-                  {/* Incident Type */}
+                  {/* Incident */}
 
                   <div className="ir-data-card">
 
                     <div className="ir-data-icon">
-
                       <FaShieldAlt />
-
                     </div>
-
 
                     <div>
 
@@ -2191,26 +2395,23 @@ const ImageRecognition = () => {
                         Incident Type
                       </span>
 
-
                       <strong>
-                        {extractedData.incident}
+                        {
+                          extractedData.incident
+                        }
                       </strong>
 
                     </div>
 
                   </div>
 
-
                   {/* Location */}
 
                   <div className="ir-data-card">
 
                     <div className="ir-data-icon">
-
                       <FaMapMarkerAlt />
-
                     </div>
-
 
                     <div>
 
@@ -2218,26 +2419,23 @@ const ImageRecognition = () => {
                         Incident Location
                       </span>
 
-
                       <strong>
-                        {extractedData.location}
+                        {
+                          extractedData.location
+                        }
                       </strong>
 
                     </div>
 
                   </div>
 
-
-                  {/* Incident Date */}
+                  {/* Date */}
 
                   <div className="ir-data-card">
 
                     <div className="ir-data-icon">
-
                       <FaCalendarAlt />
-
                     </div>
-
 
                     <div>
 
@@ -2245,26 +2443,23 @@ const ImageRecognition = () => {
                         Incident Date
                       </span>
 
-
                       <strong>
-                        {extractedData.date}
+                        {
+                          extractedData.date
+                        }
                       </strong>
 
                     </div>
 
                   </div>
 
-
-                  {/* Damage Summary */}
+                  {/* Damage */}
 
                   <div className="ir-data-card ir-data-wide">
 
                     <div className="ir-data-icon">
-
                       <FaCar />
-
                     </div>
-
 
                     <div>
 
@@ -2272,29 +2467,25 @@ const ImageRecognition = () => {
                         Damage Summary
                       </span>
 
-
                       <strong>
-                        {extractedData.damage}
+                        {
+                          extractedData.damage
+                        }
                       </strong>
 
                     </div>
 
                   </div>
 
-
                 </div>
 
               </div>
 
-
-              {/* =====================================================
-                  COMPLETE OCR TEXT
-              ====================================================== */}
+              {/* ==================================================
+                  OCR TEXT
+              =================================================== */}
 
               <div className="ir-detection-card">
-
-
-                {/* OCR Header */}
 
                 <div className="ir-detection-header">
 
@@ -2304,64 +2495,33 @@ const ImageRecognition = () => {
                       GEMINI OCR TEXT
                     </span>
 
-
                     <h3>
                       Complete Text Extracted From Image
                     </h3>
 
                   </div>
 
-
                   <FaEye />
 
                 </div>
-
-
-                {/* OCR Text Area */}
 
                 <textarea
                   className="ir-ocr-text"
                   value={
                     rawText ||
-                    "No readable text was detected from the uploaded image."
+                    "No readable text was detected."
                   }
                   readOnly
                   rows={14}
                 />
 
-
-                {/* OCR Status */}
-
-                <div
-                  style={{
-                    marginTop: "10px",
-                    fontSize: "12px",
-                    opacity: 0.65,
-                  }}
-                >
-
-                  <FaCheckCircle
-                    style={{
-                      marginRight: "6px",
-                    }}
-                  />
-
-                  Gemini Vision OCR completed successfully.
-
-                </div>
-
-
               </div>
 
-
-              {/* =====================================================
-                  AI DETECTED ELEMENTS
-              ====================================================== */}
+              {/* ==================================================
+                  DETECTED ELEMENTS
+              =================================================== */}
 
               <div className="ir-detection-card">
-
-
-                {/* Detection Header */}
 
                 <div className="ir-detection-header">
 
@@ -2371,302 +2531,133 @@ const ImageRecognition = () => {
                       FORMA AI VISION ANALYSIS
                     </span>
 
-
                     <h3>
                       Detected Insurance Elements
                     </h3>
 
                   </div>
 
-
                   <FaBrain />
 
                 </div>
 
-
-                {/* Detection Tags */}
-
                 <div className="ir-detection-tags">
-
-
-                  {/* Insurance Category */}
 
                   {extractedData.insuranceCategory &&
                     extractedData.insuranceCategory !==
-                      "Not detected" &&
-                    extractedData.insuranceCategory !==
                       "Not Found" && (
 
-                      <span>
+                    <span>
+                      <FaCheckCircle />
+                      Insurance Category
+                    </span>
 
-                        <FaCheckCircle />
-
-                        Insurance Category:
-                        {" "}
-                        {extractedData.insuranceCategory}
-
-                      </span>
-
-                    )}
-
-
-                  {/* Document Type */}
+                  )}
 
                   {extractedData.documentType &&
                     extractedData.documentType !==
-                      "Not detected" &&
-                    extractedData.documentType !==
                       "Not Found" && (
 
-                      <span>
+                    <span>
+                      <FaCheckCircle />
+                      Document Type
+                    </span>
 
-                        <FaCheckCircle />
-
-                        {extractedData.documentType}
-
-                      </span>
-
-                    )}
-
-
-                  {/* Insurance Company */}
+                  )}
 
                   {extractedData.insurerName &&
                     extractedData.insurerName !==
-                      "Not detected" &&
-                    extractedData.insurerName !==
                       "Not Found" && (
 
-                      <span>
+                    <span>
+                      <FaCheckCircle />
+                      Insurance Company
+                    </span>
 
-                        <FaCheckCircle />
-
-                        Insurance Company
-
-                      </span>
-
-                    )}
-
-
-                  {/* Policy Number */}
+                  )}
 
                   {extractedData.policyNumber &&
                     extractedData.policyNumber !==
-                      "Not detected" &&
-                    extractedData.policyNumber !==
                       "Not Found" && (
 
-                      <span>
+                    <span>
+                      <FaCheckCircle />
+                      Policy Number
+                    </span>
 
-                        <FaCheckCircle />
-
-                        Policy Number
-
-                      </span>
-
-                    )}
-
-
-                  {/* Claim Number */}
+                  )}
 
                   {extractedData.claimNumber &&
                     extractedData.claimNumber !==
-                      "Not detected" &&
-                    extractedData.claimNumber !==
                       "Not Found" && (
 
-                      <span>
+                    <span>
+                      <FaCheckCircle />
+                      Claim Number
+                    </span>
 
-                        <FaCheckCircle />
-
-                        Claim Number
-
-                      </span>
-
-                    )}
-
-
-                  {/* Policy Holder */}
+                  )}
 
                   {extractedData.policyHolder &&
                     extractedData.policyHolder !==
-                      "Not detected" &&
-                    extractedData.policyHolder !==
                       "Not Found" && (
 
-                      <span>
+                    <span>
+                      <FaCheckCircle />
+                      Policy Holder
+                    </span>
 
-                        <FaCheckCircle />
-
-                        Policy Holder
-
-                      </span>
-
-                    )}
-
-
-                  {/* Vehicle Number */}
+                  )}
 
                   {extractedData.vehicle &&
                     extractedData.vehicle !==
-                      "Not detected" &&
-                    extractedData.vehicle !==
                       "Not Found" && (
 
-                      <span>
+                    <span>
+                      <FaCheckCircle />
+                      Vehicle Number
+                    </span>
 
-                        <FaCheckCircle />
-
-                        Vehicle Number
-
-                      </span>
-
-                    )}
-
-
-                  {/* Vehicle Model */}
+                  )}
 
                   {extractedData.vehicleModel &&
                     extractedData.vehicleModel !==
-                      "Not detected" &&
-                    extractedData.vehicleModel !==
                       "Not Found" && (
 
-                      <span>
+                    <span>
+                      <FaCheckCircle />
+                      Vehicle Model
+                    </span>
 
-                        <FaCheckCircle />
-
-                        Vehicle Model
-
-                      </span>
-
-                    )}
-
-
-                  {/* Engine Number */}
-
-                  {extractedData.engineNumber &&
-                    extractedData.engineNumber !==
-                      "Not detected" &&
-                    extractedData.engineNumber !==
-                      "Not Found" && (
-
-                      <span>
-
-                        <FaCheckCircle />
-
-                        Engine Number
-
-                      </span>
-
-                    )}
-
-
-                  {/* Chassis Number */}
-
-                  {extractedData.chassisNumber &&
-                    extractedData.chassisNumber !==
-                      "Not detected" &&
-                    extractedData.chassisNumber !==
-                      "Not Found" && (
-
-                      <span>
-
-                        <FaCheckCircle />
-
-                        Chassis Number
-
-                      </span>
-
-                    )}
-
-
-                  {/* Incident */}
+                  )}
 
                   {extractedData.incident &&
                     extractedData.incident !==
-                      "Not detected" &&
-                    extractedData.incident !==
                       "Not Found" && (
 
-                      <span>
+                    <span>
+                      <FaCheckCircle />
+                      Incident Detected
+                    </span>
 
-                        <FaCheckCircle />
-
-                        Incident Detected
-
-                      </span>
-
-                    )}
-
-
-                  {/* Damage */}
+                  )}
 
                   {extractedData.damage &&
                     extractedData.damage !==
-                      "Not analyzed" &&
-                    extractedData.damage !==
                       "Not Found" && (
 
-                      <span>
+                    <span>
+                      <FaCheckCircle />
+                      Damage Analysis
+                    </span>
 
-                        <FaCheckCircle />
-
-                        Damage Analysis
-
-                      </span>
-
-                    )}
-
-
-                  {/* Location */}
-
-                  {extractedData.location &&
-                    extractedData.location !==
-                      "Not detected" &&
-                    extractedData.location !==
-                      "Not Found" && (
-
-                      <span>
-
-                        <FaCheckCircle />
-
-                        Location Found
-
-                      </span>
-
-                    )}
-
-
-                  {/* Date */}
-
-                  {extractedData.date &&
-                    extractedData.date !==
-                      "Not detected" &&
-                    extractedData.date !==
-                      "Not Found" && (
-
-                      <span>
-
-                        <FaCheckCircle />
-
-                        Incident Date
-
-                      </span>
-
-                    )}
-
-
-                  {/* OCR */}
+                  )}
 
                   {rawText && (
 
                     <span>
-
                       <FaCheckCircle />
-
                       OCR Text Extracted
-
                     </span>
 
                   )}
@@ -2675,116 +2666,272 @@ const ImageRecognition = () => {
 
               </div>
 
+              {/* ==================================================
+                  SUBMIT SECTION
+              =================================================== */}
 
-              {/* =====================================================
-                  AI EXTRACTION SUMMARY
-              ====================================================== */}
+              {!submitted ? (
 
-              <div
-                className="ir-detection-card"
-                style={{
-                  marginTop: "20px",
-                }}
-              >
-
-                <div className="ir-detection-header">
-
-                  <div>
-
-                    <span>
-                      FORMA AI EXTRACTION
-                    </span>
-
-
-                    <h3>
-                      Structured Insurance Analysis
-                    </h3>
-
-                  </div>
-
-
-                  <FaMagic />
-
-                </div>
-
-
-                <p
+                <div
+                  className="ir-detection-card"
                   style={{
-                    lineHeight: "1.7",
-                    fontSize: "13px",
-                    opacity: 0.75,
-                    margin: 0,
+                    marginTop:
+                      "20px",
                   }}
                 >
 
-                  Gemini Vision analyzed the uploaded image,
-                  identified the document type and insurance
-                  category, extracted available policy and
-                  claimant information, detected vehicle
-                  information where applicable, and performed
-                  OCR on readable text.
+                  <div className="ir-detection-header">
 
-                </p>
+                    <div>
 
-              </div>
+                      <span>
+                        CLAIM SUBMISSION
+                      </span>
 
+                      <h3>
+                        Review Complete — Submit Form
+                      </h3>
 
-              {/* =====================================================
-                  RESULT ACTIONS
-              ====================================================== */}
+                    </div>
 
-              <div className="ir-result-actions">
+                    <FaPaperPlane />
 
-                <button
-                  type="button"
-                  className="ir-secondary-action"
-                  onClick={exportOCRResults}
-                  disabled={!processed}
+                  </div>
+
+                  <p
+                    style={{
+                      lineHeight:
+                        "1.7",
+                      fontSize:
+                        "13px",
+                      opacity:
+                        0.75,
+                    }}
+                  >
+                    Review the extracted information above.
+                    When you click Submit Form, Forma AI
+                    will create the claim in MongoDB,
+                    submit it, generate the claim PDF and
+                    make it available in the Submissions page.
+                  </p>
+
+                  {/* IMPORTANT SUBMIT BUTTON */}
+
+                  <button
+                    type="button"
+                    className="ir-primary-action"
+                    onClick={
+                      handleSubmitClaim
+                    }
+                    disabled={
+                      !processed ||
+                      isSubmitting
+                    }
+                    style={{
+                      width:
+                        "100%",
+                      justifyContent:
+                        "center",
+                      marginTop:
+                        "18px",
+                      minHeight:
+                        "54px",
+                      fontSize:
+                        "15px",
+                    }}
+                  >
+
+                    {isSubmitting ? (
+
+                      <>
+                        <FaSyncAlt className="ir-spin" />
+
+                        Submitting Claim & Generating PDF...
+
+                      </>
+
+                    ) : (
+
+                      <>
+                        <FaPaperPlane />
+
+                        Submit Form
+
+                        <FaArrowRight />
+
+                      </>
+
+                    )}
+
+                  </button>
+
+                </div>
+
+              ) : (
+
+                <div
+                  className="ir-detection-card"
+                  style={{
+                    marginTop:
+                      "20px",
+                  }}
                 >
 
-                  <FaDownload />
+                  <div className="ir-detection-header">
 
-                  <span>
-                    Export OCR Results
-                  </span>
+                    <div>
 
-                </button>
+                      <span>
+                        CLAIM SUBMITTED
+                      </span>
 
+                      <h3>
+                        Submission Completed Successfully
+                      </h3>
 
-                <button
-                  type="button"
-                  className="ir-primary-action"
-                  onClick={handleUseInClaim}
-                  disabled={!processed}
-                >
+                    </div>
 
-                  <FaFileAlt />
+                    <FaCheckCircle />
 
-                  <span>
-                    Use in Claim
-                  </span>
+                  </div>
 
-                  <FaArrowRight />
+                  <div
+                    style={{
+                      display:
+                        "grid",
+                      gap:
+                        "10px",
+                      marginTop:
+                        "16px",
+                    }}
+                  >
 
-                </button>
+                    <div>
+                      <strong>
+                        Claim ID:
+                      </strong>{" "}
+                      {claimId}
+                    </div>
 
-              </div>
+                    {claimNumber && (
 
+                      <div>
+                        <strong>
+                          Claim Number:
+                        </strong>{" "}
+                        {claimNumber}
+                      </div>
 
-              {/* =====================================================
-                  ANALYSIS STATUS
-              ====================================================== */}
+                    )}
+
+                    <div>
+                      <strong>
+                        Status:
+                      </strong>{" "}
+                      Submitted
+                    </div>
+
+                    <div>
+                      <strong>
+                        PDF:
+                      </strong>{" "}
+                      {pdfUrl
+                        ? "Generated successfully"
+                        : "Generated by backend"}
+                    </div>
+
+                  </div>
+
+                  {/* PDF ACTIONS */}
+
+                  {pdfUrl && (
+
+                    <div
+                      style={{
+                        display:
+                          "flex",
+                        gap:
+                          "12px",
+                        flexWrap:
+                          "wrap",
+                        marginTop:
+                          "20px",
+                      }}
+                    >
+
+                      <button
+                        type="button"
+                        className="ir-secondary-action"
+                        onClick={
+                          openPDF
+                        }
+                      >
+
+                        <FaExternalLinkAlt />
+
+                        View PDF
+
+                      </button>
+
+                      <button
+                        type="button"
+                        className="ir-secondary-action"
+                        onClick={
+                          downloadPDF
+                        }
+                      >
+
+                        <FaFilePdf />
+
+                        Download PDF
+
+                      </button>
+
+                    </div>
+
+                  )}
+
+                  <button
+                    type="button"
+                    className="ir-primary-action"
+                    onClick={() =>
+                      navigate(
+                        "/submissions"
+                      )
+                    }
+                    style={{
+                      width:
+                        "100%",
+                      justifyContent:
+                        "center",
+                      marginTop:
+                        "18px",
+                    }}
+                  >
+
+                    <FaFileAlt />
+
+                    Go to Submissions
+
+                    <FaArrowRight />
+
+                  </button>
+
+                </div>
+
+              )}
+
+              {/* ==================================================
+                  SUCCESS
+              =================================================== */}
 
               {processed && (
 
                 <div className="ir-success-message">
 
                   <div className="ir-success-icon">
-
                     <FaCheckCircle />
-
                   </div>
-
 
                   <div className="ir-success-content">
 
@@ -2792,10 +2939,10 @@ const ImageRecognition = () => {
                       Insurance image analyzed successfully
                     </strong>
 
-
                     <span>
-                      Forma AI extracted the visible insurance
-                      information using Gemini Vision AI.
+                      Review the extracted information and
+                      use the Submit Form button to create
+                      the final insurance claim.
                     </span>
 
                   </div>
@@ -2807,36 +2954,28 @@ const ImageRecognition = () => {
             </div>
 
           )}
-          {/* END processed ternary */}
 
         </section>
-        {/* END results panel */}
 
       </main>
-      {/* END main workspace */}
 
-
-      {/* =========================================================
-          FOOTER / SECURITY INFORMATION
-      ========================================================== */}
+      {/* ====================================================
+          FOOTER
+      ===================================================== */}
 
       <div className="ir-footer">
 
         <div className="ir-footer-left">
 
           <div className="ir-footer-security">
-
             <FaShieldAlt />
-
           </div>
-
 
           <div>
 
             <strong>
               Secure AI Image Recognition
             </strong>
-
 
             <span>
               Your insurance image is processed securely
@@ -2846,7 +2985,6 @@ const ImageRecognition = () => {
           </div>
 
         </div>
-
 
         <div className="ir-footer-right">
 
@@ -2860,9 +2998,7 @@ const ImageRecognition = () => {
 
           </div>
 
-
           <FaChevronRight />
-
 
           <span>
             Image Only

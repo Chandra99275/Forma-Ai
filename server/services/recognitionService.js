@@ -4,7 +4,27 @@
 // ==========================================
 
 import fs from "fs/promises";
-import ai, { GEMINI_MODEL } from "../config/gemini.js";
+import { GoogleGenAI } from "@google/genai";
+import dotenv from "dotenv";
+import { GEMINI_MODEL } from "../config/gemini.js";
+
+dotenv.config();
+
+// ==========================================
+// Gemini API Configuration
+// ==========================================
+
+const apiKey = process.env.GEMINI_API_KEY;
+
+if (!apiKey) {
+  throw new Error(
+    "❌ GEMINI_API_KEY is missing. Please check your server/.env file."
+  );
+}
+
+const genAI = new GoogleGenAI({
+  apiKey,
+});
 
 // ==========================================
 // Gemini Retry Configuration
@@ -17,6 +37,7 @@ const MAX_GEMINI_RETRIES = 3;
 // 3 seconds
 // 6 seconds
 // 12 seconds
+
 const INITIAL_RETRY_DELAY = 3000;
 
 // ==========================================
@@ -162,13 +183,15 @@ Rules:
 - If text is partially unreadable, mention it in importantObservations.
 - Confidence must be between 0 and 100.
 - extractedFields confidence must be between 0 and 100.
-- insuranceCategory must normally be one of:
-  "health",
-  "vehicle",
-  "property",
-  "travel",
-  "life",
-  "unknown".
+
+insuranceCategory must normally be one of:
+
+"health"
+"vehicle"
+"property"
+"travel"
+"life"
+"unknown"
 
 Additional instructions:
 
@@ -227,10 +250,8 @@ function isRetryableGeminiError(error) {
     error?.error?.message ||
     "";
 
-  const normalizedMessage =
-    String(message).toLowerCase();
+  const normalizedMessage = String(message).toLowerCase();
 
-  // Gemini temporary service errors
   if (
     status === 429 ||
     status === 500 ||
@@ -241,8 +262,6 @@ function isRetryableGeminiError(error) {
     return true;
   }
 
-  // Sometimes the SDK exposes the error message
-  // without a directly accessible status code.
   if (
     normalizedMessage.includes("high demand") ||
     normalizedMessage.includes("temporarily unavailable") ||
@@ -299,29 +318,14 @@ function getGeminiErrorMessage(error) {
 
 function cleanJsonResponse(text) {
   if (!text) {
-    throw new Error(
-      "Gemini returned an empty response."
-    );
+    throw new Error("Gemini returned an empty response.");
   }
 
   let cleaned = String(text).trim();
 
-  // Remove ```json ... ```
-  cleaned = cleaned.replace(
-    /^```json\s*/i,
-    ""
-  );
-
-  // Remove ``` ... ```
-  cleaned = cleaned.replace(
-    /^```\s*/i,
-    ""
-  );
-
-  cleaned = cleaned.replace(
-    /\s*```$/i,
-    ""
-  );
+  cleaned = cleaned.replace(/^```json\s*/i, "");
+  cleaned = cleaned.replace(/^```\s*/i, "");
+  cleaned = cleaned.replace(/\s*```$/i, "");
 
   return cleaned.trim();
 }
@@ -368,7 +372,7 @@ async function generateRecognitionWithRetry(
       );
 
       const response =
-        await ai.models.generateContent({
+        await genAI.models.generateContent({
           model: GEMINI_MODEL,
 
           contents: [
@@ -396,9 +400,7 @@ async function generateRecognitionWithRetry(
 
           config: {
             temperature: 0.1,
-
-            responseMimeType:
-              "application/json",
+            responseMimeType: "application/json",
           },
         });
 
@@ -446,17 +448,11 @@ async function generateRecognitionWithRetry(
         "--------------------------------------"
       );
 
-      // Do not retry permanent errors.
       if (!retryable) {
         throw error;
       }
 
-      // If this was the final attempt,
-      // throw the original Gemini error.
-      if (
-        attempt >
-        MAX_GEMINI_RETRIES
-      ) {
+      if (attempt > MAX_GEMINI_RETRIES) {
         console.error(
           "Gemini retry limit reached."
         );
@@ -469,7 +465,7 @@ async function generateRecognitionWithRetry(
         Math.pow(2, attempt - 1);
 
       console.log(
-        `Gemini service temporarily unavailable.`
+        "Gemini service temporarily unavailable."
       );
 
       console.log(
@@ -480,10 +476,10 @@ async function generateRecognitionWithRetry(
     }
   }
 
-  throw lastError ||
-    new Error(
-      "Gemini recognition failed."
-    );
+  throw (
+    lastError ||
+    new Error("Gemini recognition failed.")
+  );
 }
 
 // ==========================================
@@ -548,8 +544,28 @@ export async function analyzeDocument(
       "Uploading document to Gemini..."
     );
 
+    /*
+     * IMPORTANT:
+     *
+     * We are using the @google/genai v2.x SDK.
+     *
+     * The previous code used:
+     *
+     * ai.files.upload(...)
+     *
+     * but the imported ai object did not expose
+     * the files API, causing:
+     *
+     * Cannot read properties of undefined
+     * (reading 'upload')
+     *
+     * Now we use the actual GoogleGenAI client:
+     *
+     * genAI.files.upload(...)
+     */
+
     uploadedFile =
-      await ai.files.upload({
+      await genAI.files.upload({
         file: filePath,
 
         config: {
@@ -601,8 +617,28 @@ export async function analyzeDocument(
     // Read Gemini Response
     // ==========================================
 
-    const responseText =
-      response?.text;
+    let responseText = "";
+
+    if (
+      typeof response?.text === "string"
+    ) {
+      responseText = response.text;
+    } else if (
+      typeof response?.text === "function"
+    ) {
+      responseText = response.text();
+    } else if (
+      response?.candidates?.length
+    ) {
+      responseText =
+        response.candidates[0]
+          ?.content
+          ?.parts
+          ?.map(
+            (part) => part.text || ""
+          )
+          .join("") || "";
+    }
 
     if (!responseText) {
       throw new Error(
@@ -686,7 +722,10 @@ export async function analyzeDocument(
       extractedData.insuranceCategory ??
       "unknown";
 
-    // Normalize insurance category
+    // ==========================================
+    // Normalize Insurance Category
+    // ==========================================
+
     const allowedCategories = [
       "health",
       "vehicle",
@@ -696,21 +735,26 @@ export async function analyzeDocument(
       "unknown",
     ];
 
+    const normalizedCategory =
+      String(
+        extractedData.insuranceCategory
+      ).toLowerCase();
+
     if (
       !allowedCategories.includes(
-        String(
-          extractedData.insuranceCategory
-        ).toLowerCase()
+        normalizedCategory
       )
     ) {
       extractedData.insuranceCategory =
         "unknown";
     } else {
       extractedData.insuranceCategory =
-        String(
-          extractedData.insuranceCategory
-        ).toLowerCase();
+        normalizedCategory;
     }
+
+    // ==========================================
+    // Normalize Confidence
+    // ==========================================
 
     extractedData.confidence =
       typeof extractedData.confidence ===
@@ -723,6 +767,10 @@ export async function analyzeDocument(
             )
           )
         : 0;
+
+    // ==========================================
+    // Normalize Summary
+    // ==========================================
 
     extractedData.summary =
       extractedData.summary ??
@@ -915,6 +963,7 @@ export async function analyzeDocument(
     );
 
     return extractedData;
+
   } catch (error) {
     console.error(
       "======================================"
@@ -950,7 +999,7 @@ export async function analyzeDocument(
     );
 
     // ==========================================
-    // Provide a clearer application error
+    // Better Error Messages
     // ==========================================
 
     if (
@@ -981,6 +1030,7 @@ export async function analyzeDocument(
     }
 
     throw error;
+
   } finally {
     // ==========================================
     // Delete Temporary Local File
@@ -988,9 +1038,7 @@ export async function analyzeDocument(
 
     if (filePath) {
       try {
-        await fs.unlink(
-          filePath
-        );
+        await fs.unlink(filePath);
 
         console.log(
           "Temporary file deleted."
