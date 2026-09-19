@@ -314,14 +314,24 @@ formSchema.pre("validate", function (next) {
       return;
     }
 
-    const { questionId } = question.showIf;
+    const {
+      questionId,
+      operator,
+      value: conditionValue,
+    } = question.showIf;
+
+    const referencedQuestion = this.questions.find(
+      (item) => item.id === questionId
+    );
 
     // The referenced question must exist in the same form.
-    if (!questionIds.includes(questionId)) {
+    if (!referencedQuestion) {
       this.invalidate(
         "questions",
         `Question "${question.id}" references a question that does not exist.`
       );
+
+      return;
     }
 
     // A question cannot depend on itself.
@@ -330,6 +340,76 @@ formSchema.pre("validate", function (next) {
         "questions",
         `Question "${question.id}" cannot reference itself in showIf.`
       );
+
+      return;
+    }
+
+    // Validate showIf operators based on the referenced question type.
+    const numericOperators = [
+      "greaterThan",
+      "lessThan",
+      "greaterThanOrEqual",
+      "lessThanOrEqual",
+    ];
+
+    const textOperators = [
+      "equals",
+      "notEquals",
+      "contains",
+    ];
+
+    const basicOperators = [
+      "equals",
+      "notEquals",
+    ];
+
+    if (referencedQuestion.type === "number") {
+      if (
+        !basicOperators.includes(operator) &&
+        !numericOperators.includes(operator)
+      ) {
+        this.invalidate(
+          "questions",
+          `Question "${question.id}" has an invalid showIf operator for number question "${questionId}".`
+        );
+      }
+
+      if (
+        numericOperators.includes(operator) &&
+        typeof conditionValue !== "number"
+      ) {
+        this.invalidate(
+          "questions",
+          `Question "${question.id}" requires a numeric showIf value for "${operator}".`
+        );
+      }
+    } else if (
+      referencedQuestion.type === "text" ||
+      referencedQuestion.type === "textarea"
+    ) {
+      if (!textOperators.includes(operator)) {
+        this.invalidate(
+          "questions",
+          `Question "${question.id}" has an invalid showIf operator for text question "${questionId}".`
+        );
+      }
+    } else if (referencedQuestion.type === "boolean") {
+      if (!basicOperators.includes(operator)) {
+        this.invalidate(
+          "questions",
+          `Question "${question.id}" has an invalid showIf operator for boolean question "${questionId}".`
+        );
+      }
+    } else if (
+      referencedQuestion.type === "select" ||
+      referencedQuestion.type === "date"
+    ) {
+      if (!basicOperators.includes(operator)) {
+        this.invalidate(
+          "questions",
+          `Question "${question.id}" has an invalid showIf operator for ${referencedQuestion.type} question "${questionId}".`
+        );
+      }
     }
   });
 
