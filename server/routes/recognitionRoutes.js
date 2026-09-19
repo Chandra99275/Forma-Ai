@@ -1,7 +1,11 @@
-
 import express from "express";
 import recognitionUpload from "../middleware/recognitionUpload.js";
-import { recognizeDocument } from "../controllers/recognitionController.js";
+
+// Existing image recognition controller
+import {
+  recognizeDocument,
+  recognizePDFDocument, // NEW - Only for PDFRecognition.jsx
+} from "../controllers/recognitionController.js";
 
 const router = express.Router();
 
@@ -11,31 +15,18 @@ const router = express.Router();
    Base Route:
    /api/recognition
 
-   Frontend ImageRecognition.jsx uses:
+   Existing Routes (UNCHANGED)
    POST /api/recognition/extract-image
-
-   Legacy/general recognition endpoint:
    POST /api/recognition/extract
+   GET  /api/recognition/health
+
+   New Route
+   POST /api/recognition/extract-pdf
    ========================================================= */
 
 
 /* =========================================================
-   IMAGE RECOGNITION
-   =========================================================
-
-   POST /api/recognition/extract-image
-
-   FormData field:
-   document
-
-   Supported image formats:
-   - JPG
-   - JPEG
-   - PNG
-   - WEBP
-
-   Used by:
-   client/src/pages/ImageRecognition.jsx
+   IMAGE RECOGNITION (UNCHANGED)
    ========================================================= */
 
 router.post(
@@ -46,18 +37,7 @@ router.post(
 
 
 /* =========================================================
-   GENERAL DOCUMENT RECOGNITION
-   =========================================================
-
-   POST /api/recognition/extract
-
-   FormData field:
-   document
-
-   This endpoint is kept for compatibility with other
-   Forma AI features that may use the recognition service.
-
-   Supported formats depend on recognitionUpload middleware.
+   GENERAL DOCUMENT RECOGNITION (UNCHANGED)
    ========================================================= */
 
 router.post(
@@ -68,12 +48,30 @@ router.post(
 
 
 /* =========================================================
-   RECOGNITION HEALTH CHECK
+   PDF RECOGNITION (NEW ROUTE ONLY)
    =========================================================
+   Used by:
+   client/src/pages/PDFRecognition.jsx
 
-   GET /api/recognition/health
+   Endpoint:
+   POST /api/recognition/extract-pdf
 
-   Used to verify that the recognition service is running.
+   FormData Field:
+   document
+
+   Supported Format:
+   PDF
+   ========================================================= */
+
+router.post(
+  "/extract-pdf",
+  recognitionUpload.single("document"),
+  recognizePDFDocument
+);
+
+
+/* =========================================================
+   RECOGNITION HEALTH CHECK (UNCHANGED)
    ========================================================= */
 
 router.get("/health", (req, res) => {
@@ -84,21 +82,18 @@ router.get("/health", (req, res) => {
 
     status: "Running",
 
-    aiModel:
-      process.env.GEMINI_MODEL ||
-      "gemini-2.5-flash",
+    aiModel: process.env.GEMINI_MODEL || "gemini-2.5-flash",
 
     timestamp: new Date().toISOString(),
 
     endpoints: {
-      imageRecognition:
-        "POST /api/recognition/extract-image",
+      imageRecognition: "POST /api/recognition/extract-image",
 
-      documentRecognition:
-        "POST /api/recognition/extract",
+      documentRecognition: "POST /api/recognition/extract",
 
-      health:
-        "GET /api/recognition/health",
+      pdfRecognition: "POST /api/recognition/extract-pdf",
+
+      health: "GET /api/recognition/health",
     },
 
     imageFormats: [

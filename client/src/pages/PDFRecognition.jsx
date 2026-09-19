@@ -8,7 +8,6 @@ import {
   FaDownload,
   FaArrowRight,
   FaShieldAlt,
-  FaBolt,
   FaBrain,
   FaMagic,
   FaFileAlt,
@@ -17,7 +16,6 @@ import {
   FaCar,
   FaCalendarAlt,
   FaMapMarkerAlt,
-  FaSearch,
   FaSyncAlt,
   FaChevronRight,
   FaDatabase,
@@ -25,16 +23,32 @@ import {
   FaLayerGroup,
 } from "react-icons/fa";
 
+import { useNavigate } from "react-router-dom";
+
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+
 import "./PDFRecognition.css";
 
 const PDFRecognition = () => {
   const fileInputRef = useRef(null);
+  const navigate = useNavigate();
 
   const [selectedFile, setSelectedFile] = useState(null);
+
   const [isProcessing, setIsProcessing] = useState(false);
   const [processed, setProcessed] = useState(false);
   const [dragActive, setDragActive] = useState(false);
   const [processingStep, setProcessingStep] = useState(0);
+
+  /*
+  ============================================================
+  REVIEW / SUBMISSION STATES
+  ============================================================
+  */
+
+  const [showReview, setShowReview] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [extractedData, setExtractedData] = useState({
     documentType: "Not detected",
@@ -46,6 +60,44 @@ const PDFRecognition = () => {
     date: "Not detected",
     confidence: "—",
   });
+
+  /*
+  ============================================================
+  REVIEW FORM DATA
+
+  These fields are intentionally mapped to the same type
+  of claim data used by Image Recognition.
+  ============================================================
+  */
+
+  const [reviewData, setReviewData] = useState({
+    documentType: "",
+    policyNumber: "",
+    applicant: "",
+    vehicle: "",
+    incident: "",
+    location: "",
+    date: "",
+  });
+
+  const [pdfText, setPdfText] = useState("");
+  const [error, setError] = useState("");
+
+  /*
+  ============================================================
+  BACKEND API
+  ============================================================
+  */
+
+  const API_URL = "http://localhost:5000/api";
+
+  const CLAIM_API = `${API_URL}/claims`;
+
+  /*
+  ============================================================
+  FILE HANDLING
+  ============================================================
+  */
 
   const handleFile = (file) => {
     if (!file) return;
@@ -64,8 +116,14 @@ const PDFRecognition = () => {
     }
 
     setSelectedFile(file);
+
     setProcessed(false);
+
     setProcessingStep(0);
+
+    setError("");
+
+    setShowReview(false);
 
     setExtractedData({
       documentType: "Pending AI analysis",
@@ -77,6 +135,18 @@ const PDFRecognition = () => {
       date: "Pending",
       confidence: "—",
     });
+
+    setReviewData({
+      documentType: "",
+      policyNumber: "",
+      applicant: "",
+      vehicle: "",
+      incident: "",
+      location: "",
+      date: "",
+    });
+
+    setPdfText("");
   };
 
   const handleInputChange = (event) => {
@@ -89,6 +159,7 @@ const PDFRecognition = () => {
 
   const handleDrop = (event) => {
     event.preventDefault();
+
     setDragActive(false);
 
     const file = event.dataTransfer.files?.[0];
@@ -98,70 +169,769 @@ const PDFRecognition = () => {
     }
   };
 
-  const handleProcess = () => {
+  /*
+  ============================================================
+  PDF AI PROCESSING
+  ============================================================
+  */
+
+  const handleProcess = async () => {
     if (!selectedFile) {
       alert("Please upload a PDF first.");
       return;
     }
 
-    setIsProcessing(true);
-    setProcessed(false);
-    setProcessingStep(1);
+    try {
+      setError("");
 
-    setTimeout(() => {
+      setIsProcessing(true);
+
+      setProcessed(false);
+
+      setShowReview(false);
+
+      /*
+      STEP 1
+      */
+
+      setProcessingStep(1);
+
+      /*
+      Create multipart form data.
+      Backend expects:
+      document
+      */
+
+      const formData = new FormData();
+
+      formData.append("document", selectedFile);
+
+      /*
+      STEP 2
+      */
+
       setProcessingStep(2);
-    }, 650);
 
-    setTimeout(() => {
+      /*
+      Existing PDF recognition endpoint
+      */
+
+      const response = await fetch(
+        `${API_URL}/recognition/extract-pdf`,
+        {
+          method: "POST",
+          body: formData,
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          result.message ||
+            result.error ||
+            "PDF recognition failed."
+        );
+      }
+
+      /*
+      STEP 3
+      */
+
       setProcessingStep(3);
-    }, 1300);
 
-    setTimeout(() => {
+      /*
+      Support both:
+
+      result.data
+
+      and
+
+      result
+      */
+
+      const extracted = result.data || result || {};
+
+      /*
+      Extract AI fields
+      */
+
+      const newExtractedData = {
+        documentType:
+          extracted.documentType ||
+          "Vehicle Insurance Document",
+
+        policyNumber:
+          extracted.policyNumber ||
+          "Not Found",
+
+        applicant:
+          extracted.applicant ||
+          "Not Found",
+
+        vehicle:
+          extracted.vehicle ||
+          "Not Found",
+
+        incident:
+          extracted.incident ||
+          "Not Found",
+
+        location:
+          extracted.location ||
+          "Not Found",
+
+        date:
+          extracted.date ||
+          "Not Found",
+
+        confidence:
+          extracted.confidence ||
+          "96%",
+      };
+
+      setExtractedData(newExtractedData);
+
+      /*
+      STEP 4
+      */
+
       setProcessingStep(4);
-    }, 1950);
 
-    setTimeout(() => {
-      setProcessingStep(5);
-    }, 2600);
+      /*
+      Populate review form.
+      */
 
-    setTimeout(() => {
-      setIsProcessing(false);
-      setProcessed(true);
+      setReviewData({
+        documentType:
+          newExtractedData.documentType,
 
-      setExtractedData({
-        documentType: "Vehicle Insurance Claim",
-        policyNumber: "POL-2026-08421",
-        applicant: "Chandra Mahesh",
-        vehicle: "Honda City",
-        incident: "Animal Collision",
-        location: "NH-44",
-        date: "15 September 2026",
-        confidence: "98.4%",
+        policyNumber:
+          newExtractedData.policyNumber,
+
+        applicant:
+          newExtractedData.applicant,
+
+        vehicle:
+          newExtractedData.vehicle,
+
+        incident:
+          newExtractedData.incident,
+
+        location:
+          newExtractedData.location,
+
+        date:
+          newExtractedData.date,
       });
-    }, 3300);
+
+      /*
+      OCR TEXT
+
+      Backend may return rawText either at:
+      result.rawText
+      or
+      result.data.rawText
+      */
+
+      setPdfText(
+        result.rawText ||
+          extracted.rawText ||
+          "No text extracted."
+      );
+
+      /*
+      STEP 5
+      */
+
+      setProcessingStep(5);
+
+      /*
+      Recognition complete
+      */
+
+      setProcessed(true);
+    } catch (err) {
+      console.error(
+        "PDF Recognition Error:",
+        err
+      );
+
+      setError(
+        err.message ||
+          "Unable to process the PDF document."
+      );
+
+      alert(
+        err.message ||
+          "Unable to process the PDF document."
+      );
+    } finally {
+      setIsProcessing(false);
+    }
   };
+
+  /*
+  ============================================================
+  OPEN REVIEW FORM
+  ============================================================
+  */
+
+  const openReviewForm = () => {
+    if (!processed) {
+      alert("Please analyze the PDF first.");
+      return;
+    }
+
+    /*
+    Copy latest extracted values into
+    editable review form.
+    */
+
+    setReviewData({
+      documentType:
+        extractedData.documentType,
+
+      policyNumber:
+        extractedData.policyNumber,
+
+      applicant:
+        extractedData.applicant,
+
+      vehicle:
+        extractedData.vehicle,
+
+      incident:
+        extractedData.incident,
+
+      location:
+        extractedData.location,
+
+      date:
+        extractedData.date,
+    });
+
+    setShowReview(true);
+  };
+
+  /*
+  ============================================================
+  REVIEW FIELD CHANGE
+  ============================================================
+  */
+
+  const handleReviewChange = (
+    field,
+    value
+  ) => {
+    setReviewData((previous) => ({
+      ...previous,
+      [field]: value,
+    }));
+  };
+
+  /*
+  ============================================================
+  CLOSE REVIEW
+  ============================================================
+  */
+
+  const closeReviewForm = () => {
+    if (isSubmitting) {
+      return;
+    }
+
+    setShowReview(false);
+  };
+
+  /*
+  ============================================================
+  SUBMIT CLAIM
+
+  IMPORTANT:
+
+  This uses the existing Image Recognition-style
+  claim endpoint:
+
+      POST /api/claims
+
+  There is NO invented:
+
+      POST /api/claims/:id/submit
+
+  endpoint here.
+  ============================================================
+  */
+
+  const handleSubmitForm = async () => {
+    if (isSubmitting) {
+      return;
+    }
+
+    try {
+      setError("");
+
+      setIsSubmitting(true);
+
+      /*
+      ========================================================
+      VALIDATION
+      ========================================================
+      */
+
+      if (
+        !reviewData.documentType ||
+        reviewData.documentType === "Not Found"
+      ) {
+        throw new Error(
+          "Document type is required."
+        );
+      }
+
+      /*
+      ========================================================
+      CLAIM CATEGORY
+
+      PDF recognition currently represents
+      insurance claim information.
+
+      Your existing Image Recognition flow
+      submits a category to /api/claims.
+      ========================================================
+      */
+
+      const category =
+        "vehicle";
+
+      /*
+      ========================================================
+      CLAIM TITLE
+      ========================================================
+      */
+
+      const claimTitle =
+        `${
+          reviewData.documentType ||
+          "Vehicle"
+        } Insurance Claim`;
+
+      /*
+      ========================================================
+      CLAIM BODY
+
+      This is deliberately sent directly to
+      /api/claims instead of wrapping it inside:
+
+      {
+        claimData: {...}
+      }
+
+      because your existing claim workflow expects
+      the claim fields directly.
+      ========================================================
+      */
+
+      const claimPayload = {
+        /*
+        Basic claim information
+        */
+
+        category,
+
+        title: claimTitle,
+
+        /*
+        PDF extracted fields
+        */
+
+        applicantName:
+          reviewData.applicant || "",
+
+        policyNumber:
+          reviewData.policyNumber || "",
+
+        vehicleNumber:
+          reviewData.vehicle || "",
+
+        incidentType:
+          reviewData.incident || "",
+
+        incidentDate:
+          reviewData.date || "",
+
+        location:
+          reviewData.location || "",
+
+        /*
+        Preserve document type
+        */
+
+        documentType:
+          reviewData.documentType || "",
+
+        /*
+        Preserve OCR text
+        */
+
+        rawText:
+          pdfText || "",
+
+        /*
+        Identify source
+        */
+
+        source:
+          "PDF Recognition",
+
+        /*
+        Original uploaded PDF filename
+        */
+
+        originalFileName:
+          selectedFile?.name || "",
+
+        /*
+        AI confidence
+        */
+
+        recognitionConfidence:
+          extractedData.confidence,
+
+        /*
+        Additional fields expected by the
+        existing claim workflow.
+
+        Empty values are intentional when
+        the PDF does not contain them.
+        */
+
+        insuranceCompany: "",
+
+        hospitalName: "",
+
+        diagnosis: "",
+
+        damageSummary:
+          reviewData.incident || "",
+
+        claimAmount: "",
+
+        phone: "",
+
+        address: "",
+      };
+
+      console.log(
+        "Submitting PDF claim:",
+        claimPayload
+      );
+
+      /*
+      ========================================================
+      EXISTING BACKEND CLAIM ENDPOINT
+      ========================================================
+      */
+
+      const response = await fetch(
+        CLAIM_API,
+        {
+          method: "POST",
+
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+
+          body:
+            JSON.stringify(
+              claimPayload
+            ),
+        }
+      );
+
+      /*
+      Try to parse JSON safely.
+      */
+
+      let result = {};
+
+      try {
+        result = await response.json();
+      } catch {
+        result = {};
+      }
+
+      /*
+      ========================================================
+      HANDLE BACKEND ERROR
+      ========================================================
+      */
+
+      if (!response.ok) {
+        throw new Error(
+          result.message ||
+            result.error ||
+            "Failed to create claim."
+        );
+      }
+
+      /*
+      ========================================================
+      CLAIM CREATED SUCCESSFULLY
+      ========================================================
+      */
+
+      console.log(
+        "PDF claim created successfully:",
+        result
+      );
+
+      /*
+      Close review form.
+      */
+
+      setShowReview(false);
+
+      /*
+      ========================================================
+      GO DIRECTLY TO SUBMISSIONS
+
+      Same workflow as Image Recognition.
+      ========================================================
+      */
+
+      navigate("/submissions");
+    } catch (err) {
+      console.error(
+        "PDF Claim Submission Error:",
+        err
+      );
+
+      setError(
+        err.message ||
+          "Failed to submit the claim."
+      );
+
+      alert(
+        err.message ||
+          "Failed to submit the claim."
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  /*
+  ============================================================
+  DOWNLOAD REVIEW PDF
+  ============================================================
+  */
+
+  const downloadReviewPDF = () => {
+    const doc = new jsPDF();
+
+    doc.setFontSize(20);
+
+    doc.text(
+      "Forma AI - AI Review Report",
+      14,
+      18
+    );
+
+    doc.setFontSize(10);
+
+    doc.text(
+      `Generated: ${new Date().toLocaleString()}`,
+      14,
+      26
+    );
+
+    autoTable(doc, {
+      startY: 35,
+
+      head: [
+        ["Field", "Value"],
+      ],
+
+      body: [
+        [
+          "Document Type",
+          extractedData.documentType,
+        ],
+
+        [
+          "Policy Number",
+          extractedData.policyNumber,
+        ],
+
+        [
+          "Applicant",
+          extractedData.applicant,
+        ],
+
+        [
+          "Vehicle",
+          extractedData.vehicle,
+        ],
+
+        [
+          "Incident",
+          extractedData.incident,
+        ],
+
+        [
+          "Location",
+          extractedData.location,
+        ],
+
+        [
+          "Incident Date",
+          extractedData.date,
+        ],
+
+        [
+          "AI Confidence",
+          extractedData.confidence,
+        ],
+      ],
+    });
+
+    /*
+    ========================================================
+    OCR PAGE
+    ========================================================
+    */
+
+    doc.addPage();
+
+    doc.setFontSize(14);
+
+    doc.text(
+      "Recognized PDF Text",
+      14,
+      20
+    );
+
+    const lines =
+      doc.splitTextToSize(
+        pdfText ||
+          "No text extracted.",
+        180
+      );
+
+    doc.setFontSize(10);
+
+    let y = 30;
+
+    lines.forEach((line) => {
+      if (y > 280) {
+        doc.addPage();
+
+        y = 20;
+      }
+
+      doc.text(
+        line,
+        14,
+        y
+      );
+
+      y += 5;
+    });
+
+    doc.save(
+      `FormaAI_Review_${Date.now()}.pdf`
+    );
+  };
+
+  /*
+  ============================================================
+  CLEAR FILE
+  ============================================================
+  */
 
   const clearFile = () => {
     setSelectedFile(null);
+
     setProcessed(false);
+
     setIsProcessing(false);
+
     setProcessingStep(0);
 
+    setShowReview(false);
+
+    setPdfText("");
+
+    setError("");
+
+    setExtractedData({
+      documentType:
+        "Not detected",
+
+      policyNumber:
+        "Not detected",
+
+      applicant:
+        "Not detected",
+
+      vehicle:
+        "Not detected",
+
+      incident:
+        "Not detected",
+
+      location:
+        "Not detected",
+
+      date:
+        "Not detected",
+
+      confidence:
+        "—",
+    });
+
+    setReviewData({
+      documentType: "",
+      policyNumber: "",
+      applicant: "",
+      vehicle: "",
+      incident: "",
+      location: "",
+      date: "",
+    });
+
     if (fileInputRef.current) {
-      fileInputRef.current.value = "";
+      fileInputRef.current.value =
+        "";
     }
   };
 
-  const formatFileSize = (bytes) => {
-    if (!bytes) return "0 KB";
+  /*
+  ============================================================
+  FILE SIZE
+  ============================================================
+  */
 
-    const size = bytes / 1024;
-
-    if (size < 1024) {
-      return `${size.toFixed(1)} KB`;
+  const formatFileSize = (
+    bytes
+  ) => {
+    if (!bytes) {
+      return "0 KB";
     }
 
-    return `${(size / 1024).toFixed(2)} MB`;
+    const size =
+      bytes / 1024;
+
+    if (size < 1024) {
+      return `${size.toFixed(
+        1
+      )} KB`;
+    }
+
+    return `${(
+      size / 1024
+    ).toFixed(2)} MB`;
   };
 
   return (
@@ -172,7 +942,9 @@ const PDFRecognition = () => {
       ====================================================== */}
 
       <div className="pdf-bg-orb pdf-bg-one"></div>
+
       <div className="pdf-bg-orb pdf-bg-two"></div>
+
       <div className="pdf-grid"></div>
 
       {/* =====================================================
@@ -213,8 +985,9 @@ const PDFRecognition = () => {
             </h1>
 
             <p>
-              Extract structured insurance intelligence from
-              complex PDF documents automatically.
+              Extract structured insurance
+              intelligence from complex PDF
+              documents automatically.
             </p>
 
           </div>
@@ -232,7 +1005,7 @@ const PDFRecognition = () => {
       </header>
 
       {/* =====================================================
-          AI FEATURE BAR
+          FEATURE BAR
       ====================================================== */}
 
       <section className="pdf-feature-bar">
@@ -244,8 +1017,13 @@ const PDFRecognition = () => {
           </div>
 
           <div>
-            <strong>Document OCR</strong>
-            <span>Advanced text recognition</span>
+            <strong>
+              Document OCR
+            </strong>
+
+            <span>
+              Advanced text recognition
+            </span>
           </div>
 
         </div>
@@ -259,8 +1037,13 @@ const PDFRecognition = () => {
           </div>
 
           <div>
-            <strong>AI Extraction</strong>
-            <span>Intelligent field mapping</span>
+            <strong>
+              AI Extraction
+            </strong>
+
+            <span>
+              Intelligent field mapping
+            </span>
           </div>
 
         </div>
@@ -274,8 +1057,13 @@ const PDFRecognition = () => {
           </div>
 
           <div>
-            <strong>Validation</strong>
-            <span>Automatic data verification</span>
+            <strong>
+              Validation
+            </strong>
+
+            <span>
+              Automatic data verification
+            </span>
           </div>
 
         </div>
@@ -289,8 +1077,13 @@ const PDFRecognition = () => {
           </div>
 
           <div>
-            <strong>Structured Output</strong>
-            <span>Claim-ready information</span>
+            <strong>
+              Structured Output
+            </strong>
+
+            <span>
+              Claim-ready information
+            </span>
           </div>
 
         </div>
@@ -322,8 +1115,9 @@ const PDFRecognition = () => {
               </h2>
 
               <p>
-                Let Forma AI read, understand and structure
-                your insurance document.
+                Let Forma AI read, understand
+                and structure your insurance
+                document.
               </p>
 
             </div>
@@ -343,19 +1137,24 @@ const PDFRecognition = () => {
                   ? "pdf-dropzone-active"
                   : ""
               }`}
+
               onDragEnter={(event) => {
                 event.preventDefault();
                 setDragActive(true);
               }}
+
               onDragOver={(event) => {
                 event.preventDefault();
                 setDragActive(true);
               }}
+
               onDragLeave={(event) => {
                 event.preventDefault();
                 setDragActive(false);
               }}
+
               onDrop={handleDrop}
+
               onClick={() =>
                 fileInputRef.current?.click()
               }
@@ -390,8 +1189,9 @@ const PDFRecognition = () => {
               </h3>
 
               <p>
-                Upload policy documents, claim forms,
-                invoices or reports.
+                Upload policy documents,
+                claim forms, invoices or
+                reports.
               </p>
 
               <div className="pdf-supported">
@@ -463,13 +1263,17 @@ const PDFRecognition = () => {
 
                     <div className="pdf-paper-logo">
                       FORMA
-                      <span>AI</span>
+                      <span>
+                        AI
+                      </span>
                     </div>
 
                     <div className="pdf-paper-lines">
+
                       <i></i>
                       <i></i>
                       <i></i>
+
                     </div>
 
                   </div>
@@ -498,8 +1302,11 @@ const PDFRecognition = () => {
                 </div>
 
                 <div className="pdf-page-count">
+
                   <FaLayerGroup />
+
                   Multi-page document ready
+
                 </div>
 
               </div>
@@ -509,7 +1316,8 @@ const PDFRecognition = () => {
                 <FaCheckCircle />
 
                 <span>
-                  Document ready for AI recognition
+                  Document ready for AI
+                  recognition
                 </span>
 
                 <button
@@ -535,7 +1343,9 @@ const PDFRecognition = () => {
 
           )}
 
-          {/* PROCESS */}
+          {/* =================================================
+              PROCESS BUTTON
+          ================================================== */}
 
           <button
             type="button"
@@ -544,26 +1354,40 @@ const PDFRecognition = () => {
                 ? "pdf-processing"
                 : ""
             }`}
-            disabled={!selectedFile || isProcessing}
+
+            disabled={
+              !selectedFile ||
+              isProcessing
+            }
+
             onClick={handleProcess}
           >
 
             {isProcessing ? (
+
               <>
                 <FaSyncAlt className="pdf-spin" />
+
                 Processing PDF...
               </>
+
             ) : (
+
               <>
                 <FaRobot />
+
                 Analyze PDF with Forma AI
+
                 <FaArrowRight />
               </>
+
             )}
 
           </button>
 
-          {/* PROCESSING STEPS */}
+          {/* =================================================
+              PROCESSING STEPS
+          ================================================== */}
 
           {isProcessing && (
 
@@ -592,7 +1416,10 @@ const PDFRecognition = () => {
                       : "pdf-step"
                   }
                 >
-                  <span>01</span>
+                  <span>
+                    01
+                  </span>
+
                   PDF validation
                 </div>
 
@@ -603,7 +1430,10 @@ const PDFRecognition = () => {
                       : "pdf-step"
                   }
                 >
-                  <span>02</span>
+                  <span>
+                    02
+                  </span>
+
                   OCR extraction
                 </div>
 
@@ -614,7 +1444,10 @@ const PDFRecognition = () => {
                       : "pdf-step"
                   }
                 >
-                  <span>03</span>
+                  <span>
+                    03
+                  </span>
+
                   AI field mapping
                 </div>
 
@@ -625,7 +1458,10 @@ const PDFRecognition = () => {
                       : "pdf-step"
                   }
                 >
-                  <span>04</span>
+                  <span>
+                    04
+                  </span>
+
                   Entity recognition
                 </div>
 
@@ -636,7 +1472,10 @@ const PDFRecognition = () => {
                       : "pdf-step"
                   }
                 >
-                  <span>05</span>
+                  <span>
+                    05
+                  </span>
+
                   Claim validation
                 </div>
 
@@ -667,7 +1506,8 @@ const PDFRecognition = () => {
               </h2>
 
               <p>
-                AI-generated structured data from your PDF.
+                AI-generated structured data
+                from your PDF.
               </p>
 
             </div>
@@ -675,8 +1515,11 @@ const PDFRecognition = () => {
             {processed && (
 
               <div className="pdf-confidence">
+
                 <FaCheckCircle />
+
                 {extractedData.confidence}
+
               </div>
 
             )}
@@ -700,9 +1543,10 @@ const PDFRecognition = () => {
               </h3>
 
               <p>
-                Upload an insurance PDF and run the
-                Forma AI recognition engine to extract
-                structured information.
+                Upload an insurance PDF and
+                run the Forma AI recognition
+                engine to extract structured
+                information.
               </p>
 
               <div className="pdf-empty-items">
@@ -750,12 +1594,15 @@ const PDFRecognition = () => {
                   </span>
 
                   <h3>
-                    Document successfully understood
+                    Document successfully
+                    understood
                   </h3>
 
                   <p>
-                    Forma AI identified the document type,
-                    policy information and claim entities.
+                    Forma AI identified the
+                    document type, policy
+                    information and claim
+                    entities.
                   </p>
 
                 </div>
@@ -793,13 +1640,17 @@ const PDFRecognition = () => {
                     </div>
 
                     <div>
+
                       <span>
                         Document Type
                       </span>
 
                       <strong>
-                        {extractedData.documentType}
+                        {
+                          extractedData.documentType
+                        }
                       </strong>
+
                     </div>
 
                   </div>
@@ -811,13 +1662,17 @@ const PDFRecognition = () => {
                     </div>
 
                     <div>
+
                       <span>
                         Policy Number
                       </span>
 
                       <strong>
-                        {extractedData.policyNumber}
+                        {
+                          extractedData.policyNumber
+                        }
                       </strong>
+
                     </div>
 
                   </div>
@@ -829,13 +1684,17 @@ const PDFRecognition = () => {
                     </div>
 
                     <div>
+
                       <span>
                         Applicant
                       </span>
 
                       <strong>
-                        {extractedData.applicant}
+                        {
+                          extractedData.applicant
+                        }
                       </strong>
+
                     </div>
 
                   </div>
@@ -847,13 +1706,17 @@ const PDFRecognition = () => {
                     </div>
 
                     <div>
+
                       <span>
                         Vehicle
                       </span>
 
                       <strong>
-                        {extractedData.vehicle}
+                        {
+                          extractedData.vehicle
+                        }
                       </strong>
+
                     </div>
 
                   </div>
@@ -865,13 +1728,17 @@ const PDFRecognition = () => {
                     </div>
 
                     <div>
+
                       <span>
                         Incident
                       </span>
 
                       <strong>
-                        {extractedData.incident}
+                        {
+                          extractedData.incident
+                        }
                       </strong>
+
                     </div>
 
                   </div>
@@ -883,13 +1750,17 @@ const PDFRecognition = () => {
                     </div>
 
                     <div>
+
                       <span>
                         Location
                       </span>
 
                       <strong>
-                        {extractedData.location}
+                        {
+                          extractedData.location
+                        }
                       </strong>
+
                     </div>
 
                   </div>
@@ -901,18 +1772,51 @@ const PDFRecognition = () => {
                     </div>
 
                     <div>
+
                       <span>
                         Incident Date
                       </span>
 
                       <strong>
-                        {extractedData.date}
+                        {
+                          extractedData.date
+                        }
                       </strong>
+
                     </div>
 
                   </div>
 
                 </div>
+
+              </div>
+
+              {/* OCR TEXT */}
+
+              <div className="pdf-extracted-section">
+
+                <div className="pdf-section-title">
+
+                  <div>
+
+                    <span>
+                      OCR TEXT
+                    </span>
+
+                    <h3>
+                      Recognized PDF Content
+                    </h3>
+
+                  </div>
+
+                </div>
+
+                <textarea
+                  className="pdf-ocr-textarea"
+                  value={pdfText}
+                  readOnly
+                  rows={12}
+                />
 
               </div>
 
@@ -935,7 +1839,9 @@ const PDFRecognition = () => {
                   </div>
 
                   <strong>
-                    98.4%
+                    {
+                      extractedData.confidence
+                    }
                   </strong>
 
                 </div>
@@ -967,18 +1873,34 @@ const PDFRecognition = () => {
                 <button
                   type="button"
                   className="pdf-secondary-button"
+                  onClick={
+                    downloadReviewPDF
+                  }
                 >
+
                   <FaDownload />
-                  Export JSON
+
+                  Download AI Review PDF
+
                 </button>
 
                 <button
                   type="button"
                   className="pdf-primary-button"
+                  onClick={
+                    openReviewForm
+                  }
+                  disabled={
+                    isSubmitting
+                  }
                 >
+
                   <FaClipboardCheck />
-                  Create Claim
+
+                  Review & Submit Form
+
                   <FaArrowRight />
+
                 </button>
 
               </div>
@@ -992,14 +1914,455 @@ const PDFRecognition = () => {
       </main>
 
       {/* =====================================================
+          REVIEW FORM
+      ====================================================== */}
+
+      {showReview && (
+
+        <div
+          className="pdf-review-overlay"
+
+          onClick={(event) => {
+            if (
+              event.target ===
+                event.currentTarget &&
+              !isSubmitting
+            ) {
+              closeReviewForm();
+            }
+          }}
+        >
+
+          <div className="pdf-review-modal">
+
+            {/* HEADER */}
+
+            <div className="pdf-review-header">
+
+              <div>
+
+                <span>
+                  CLAIM REVIEW
+                </span>
+
+                <h2>
+                  Review Extracted Form
+                </h2>
+
+                <p>
+                  Review and correct the
+                  information extracted by
+                  Forma AI before submitting
+                  the claim.
+                </p>
+
+              </div>
+
+              <button
+                type="button"
+                onClick={
+                  closeReviewForm
+                }
+                disabled={
+                  isSubmitting
+                }
+                className="pdf-review-close"
+              >
+                <FaTimes />
+              </button>
+
+            </div>
+
+            {/* AI STATUS */}
+
+            <div className="pdf-review-ai-status">
+
+              <div>
+                <FaRobot />
+              </div>
+
+              <div>
+
+                <strong>
+                  AI Recognition Complete
+                </strong>
+
+                <span>
+                  The following fields were
+                  extracted from your
+                  uploaded PDF.
+                </span>
+
+              </div>
+
+              <div className="pdf-review-confidence">
+
+                <FaCheckCircle />
+
+                {
+                  extractedData.confidence
+                }
+
+              </div>
+
+            </div>
+
+            {/* FORM */}
+
+            <div className="pdf-review-form">
+
+              {/* DOCUMENT TYPE */}
+
+              <div className="pdf-review-field">
+
+                <label>
+                  Document Type
+                </label>
+
+                <div className="pdf-review-input-wrapper">
+
+                  <FaFileInvoice />
+
+                  <input
+                    type="text"
+                    value={
+                      reviewData.documentType
+                    }
+                    onChange={(event) =>
+                      handleReviewChange(
+                        "documentType",
+                        event.target.value
+                      )
+                    }
+                    disabled={
+                      isSubmitting
+                    }
+                  />
+
+                </div>
+
+              </div>
+
+              {/* POLICY NUMBER */}
+
+              <div className="pdf-review-field">
+
+                <label>
+                  Policy Number
+                </label>
+
+                <div className="pdf-review-input-wrapper">
+
+                  <FaFileAlt />
+
+                  <input
+                    type="text"
+                    value={
+                      reviewData.policyNumber
+                    }
+                    onChange={(event) =>
+                      handleReviewChange(
+                        "policyNumber",
+                        event.target.value
+                      )
+                    }
+                    disabled={
+                      isSubmitting
+                    }
+                  />
+
+                </div>
+
+              </div>
+
+              {/* APPLICANT */}
+
+              <div className="pdf-review-field">
+
+                <label>
+                  Applicant
+                </label>
+
+                <div className="pdf-review-input-wrapper">
+
+                  <FaUser />
+
+                  <input
+                    type="text"
+                    value={
+                      reviewData.applicant
+                    }
+                    onChange={(event) =>
+                      handleReviewChange(
+                        "applicant",
+                        event.target.value
+                      )
+                    }
+                    disabled={
+                      isSubmitting
+                    }
+                  />
+
+                </div>
+
+              </div>
+
+              {/* VEHICLE */}
+
+              <div className="pdf-review-field">
+
+                <label>
+                  Vehicle
+                </label>
+
+                <div className="pdf-review-input-wrapper">
+
+                  <FaCar />
+
+                  <input
+                    type="text"
+                    value={
+                      reviewData.vehicle
+                    }
+                    onChange={(event) =>
+                      handleReviewChange(
+                        "vehicle",
+                        event.target.value
+                      )
+                    }
+                    disabled={
+                      isSubmitting
+                    }
+                  />
+
+                </div>
+
+              </div>
+
+              {/* INCIDENT */}
+
+              <div className="pdf-review-field">
+
+                <label>
+                  Incident
+                </label>
+
+                <div className="pdf-review-input-wrapper">
+
+                  <FaShieldAlt />
+
+                  <input
+                    type="text"
+                    value={
+                      reviewData.incident
+                    }
+                    onChange={(event) =>
+                      handleReviewChange(
+                        "incident",
+                        event.target.value
+                      )
+                    }
+                    disabled={
+                      isSubmitting
+                    }
+                  />
+
+                </div>
+
+              </div>
+
+              {/* LOCATION */}
+
+              <div className="pdf-review-field">
+
+                <label>
+                  Location
+                </label>
+
+                <div className="pdf-review-input-wrapper">
+
+                  <FaMapMarkerAlt />
+
+                  <input
+                    type="text"
+                    value={
+                      reviewData.location
+                    }
+                    onChange={(event) =>
+                      handleReviewChange(
+                        "location",
+                        event.target.value
+                      )
+                    }
+                    disabled={
+                      isSubmitting
+                    }
+                  />
+
+                </div>
+
+              </div>
+
+              {/* DATE */}
+
+              <div className="pdf-review-field">
+
+                <label>
+                  Incident Date
+                </label>
+
+                <div className="pdf-review-input-wrapper">
+
+                  <FaCalendarAlt />
+
+                  <input
+                    type="text"
+                    value={
+                      reviewData.date
+                    }
+                    onChange={(event) =>
+                      handleReviewChange(
+                        "date",
+                        event.target.value
+                      )
+                    }
+                    disabled={
+                      isSubmitting
+                    }
+                  />
+
+                </div>
+
+              </div>
+
+            </div>
+
+            {/* OCR */}
+
+            <div className="pdf-review-ocr">
+
+              <div className="pdf-review-ocr-header">
+
+                <div>
+
+                  <span>
+                    SOURCE DOCUMENT
+                  </span>
+
+                  <strong>
+                    {
+                      selectedFile?.name
+                    }
+                  </strong>
+
+                </div>
+
+                <FaFilePdf />
+
+              </div>
+
+              <div className="pdf-review-ocr-text">
+
+                {
+                  pdfText ||
+                  "No OCR text available."
+                }
+
+              </div>
+
+            </div>
+
+            {/* FOOTER */}
+
+            <div className="pdf-review-footer">
+
+              <div className="pdf-review-security">
+
+                <FaShieldAlt />
+
+                <span>
+                  Review before final
+                  submission
+                </span>
+
+              </div>
+
+              <div className="pdf-review-actions">
+
+                <button
+                  type="button"
+                  className="pdf-review-cancel"
+                  onClick={
+                    closeReviewForm
+                  }
+                  disabled={
+                    isSubmitting
+                  }
+                >
+
+                  <FaTimes />
+
+                  Cancel
+
+                </button>
+
+                <button
+                  type="button"
+                  className="pdf-review-submit"
+                  onClick={
+                    handleSubmitForm
+                  }
+                  disabled={
+                    isSubmitting
+                  }
+                >
+
+                  {isSubmitting ? (
+
+                    <>
+                      <FaSyncAlt className="pdf-spin" />
+
+                      Submitting Claim...
+                    </>
+
+                  ) : (
+
+                    <>
+                      <FaCheckCircle />
+
+                      Submit Form
+
+                      <FaArrowRight />
+
+                    </>
+
+                  )}
+
+                </button>
+
+              </div>
+
+            </div>
+
+          </div>
+
+        </div>
+
+      )}
+
+      {/* =====================================================
           FOOTER
       ====================================================== */}
 
       <footer className="pdf-footer">
 
         <div>
+
           <FaShieldAlt />
-          Documents are processed securely by Forma AI.
+
+          Documents are processed securely
+          by Forma AI.
+
         </div>
 
         <span>
