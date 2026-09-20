@@ -393,6 +393,16 @@ formSchema.pre("validate", function (next) {
           `Question "${question.id}" has an invalid showIf operator for text question "${questionId}".`
         );
       }
+
+      if (
+        ["equals", "notEquals", "contains"].includes(operator) &&
+        typeof conditionValue !== "string"
+      ) {
+        this.invalidate(
+          "questions",
+          `Question "${question.id}" requires a text showIf value for "${operator}".`
+        );
+      }
     } else if (referencedQuestion.type === "boolean") {
       if (!basicOperators.includes(operator)) {
         this.invalidate(
@@ -400,14 +410,49 @@ formSchema.pre("validate", function (next) {
           `Question "${question.id}" has an invalid showIf operator for boolean question "${questionId}".`
         );
       }
-    } else if (
-      referencedQuestion.type === "select" ||
-      referencedQuestion.type === "date"
-    ) {
+
+      if (
+        basicOperators.includes(operator) &&
+        typeof conditionValue !== "boolean"
+      ) {
+        this.invalidate(
+          "questions",
+          `Question "${question.id}" requires a boolean showIf value for "${operator}".`
+        );
+      }
+    }
+    else if (referencedQuestion.type === "select") {
       if (!basicOperators.includes(operator)) {
         this.invalidate(
           "questions",
-          `Question "${question.id}" has an invalid showIf operator for ${referencedQuestion.type} question "${questionId}".`
+          `Question "${question.id}" has an invalid showIf operator for select question "${questionId}".`
+        );
+      }
+
+      if (
+        basicOperators.includes(operator) &&
+        !referencedQuestion.options.includes(conditionValue)
+      ) {
+        this.invalidate(
+          "questions",
+          `Question "${question.id}" must use one of the available options from select question "${questionId}".`
+        );
+      }
+    } else if (referencedQuestion.type === "date") {
+      if (!basicOperators.includes(operator)) {
+        this.invalidate(
+          "questions",
+          `Question "${question.id}" has an invalid showIf operator for date question "${questionId}".`
+        );
+      }
+
+      if (
+        basicOperators.includes(operator) &&
+        typeof conditionValue !== "string"
+      ) {
+        this.invalidate(
+          "questions",
+          `Question "${question.id}" requires a date string as the showIf value.`
         );
       }
     }
