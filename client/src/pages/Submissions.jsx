@@ -41,6 +41,8 @@ import {
   FaSave,
   FaExclamationTriangle,
   FaPlus,
+  FaCloudUploadAlt,
+  FaImage,
 } from "react-icons/fa";
 
 // ==========================================
@@ -52,6 +54,7 @@ import {
   getClaimById,
   updateClaim,
   deleteClaim,
+  uploadClaimDocuments,
 } from "../services/claimService";
 
 // ==========================================
@@ -903,6 +906,14 @@ const Submissions = () => {
   ] = useState(false);
 
   // ========================================
+  // Edit Document Upload State
+  // ========================================
+
+  const [editDocuments, setEditDocuments] = useState([]);
+  const [uploadingEditDocuments, setUploadingEditDocuments] = useState(false);
+  const [editDocumentError, setEditDocumentError] = useState("");
+
+  // ========================================
   // Delete State
   // ========================================
 
@@ -1352,6 +1363,9 @@ const Submissions = () => {
         // IMPORTANT:
         // Store actual object instead
         // of JSON string.
+        setEditDocuments([]);
+        setEditDocumentError("");
+
         setEditClaimData(
           claim.claimData &&
             typeof claim.claimData ===
@@ -1483,6 +1497,61 @@ const Submissions = () => {
     };
 
   // ========================================
+  // Edit Document Selection
+  // ========================================
+
+  const handleEditDocumentChange = (event) => {
+    const selected = Array.from(event.target.files || []);
+    const MAX_FILE_SIZE = 10 * 1024 * 1024;
+
+    const isAllowedFile = (file) => {
+      const name = String(file?.name || "").toLowerCase();
+      return (
+        file?.type === "application/pdf" ||
+        file?.type?.startsWith("image/") ||
+        /\.(pdf|jpg|jpeg|png|webp)$/.test(name)
+      );
+    };
+
+    const invalid = selected.filter((file) => !isAllowedFile(file));
+    const oversized = selected.filter((file) => file.size > MAX_FILE_SIZE);
+
+    if (invalid.length > 0) {
+      setEditDocumentError("Only JPG, JPEG, PNG, WEBP images and PDF files are allowed.");
+    } else if (oversized.length > 0) {
+      setEditDocumentError("Each file must be 10 MB or smaller.");
+    } else {
+      setEditDocumentError("");
+    }
+
+    const validFiles = selected.filter(
+      (file) => isAllowedFile(file) && file.size <= MAX_FILE_SIZE
+    );
+
+    setEditDocuments((previous) => {
+      const combined = [...previous, ...validFiles];
+      const unique = [];
+      const seen = new Set();
+
+      combined.forEach((file) => {
+        const key = `${file.name}-${file.size}-${file.lastModified}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          unique.push(file);
+        }
+      });
+
+      return unique;
+    });
+
+    event.target.value = "";
+  };
+
+  const removeEditDocument = (index) => {
+    setEditDocuments((previous) => previous.filter((_, i) => i !== index));
+  };
+
+  // ========================================
   // Close Edit
   // ========================================
 
@@ -1499,6 +1568,8 @@ const Submissions = () => {
       setEditCategory("");
 
       setEditClaimData({});
+      setEditDocuments([]);
+      setEditDocumentError("");
 
       setEditError("");
     };
@@ -1511,104 +1582,103 @@ const Submissions = () => {
     async () => {
       try {
         setEditError("");
+        setEditDocumentError("");
 
-        if (
-          !editingSubmission?._id
-        ) {
-          throw new Error(
-            "Claim ID is missing."
-          );
+        if (!editingSubmission?._id) {
+          throw new Error("Claim ID is missing.");
         }
 
-        if (
-          !ALLOWED_CATEGORIES.includes(
-            editCategory
-          )
-        ) {
-          throw new Error(
-            "Please select a valid insurance category."
-          );
+        if (!ALLOWED_CATEGORIES.includes(editCategory)) {
+          throw new Error("Please select a valid insurance category.");
         }
 
-        setSavingEdit(
-          true
+        if (!editClaimData || typeof editClaimData !== "object" || Array.isArray(editClaimData)) {
+          throw new Error("Claim data must be a valid object.");
+        }
+
+        setSavingEdit(true);
+
+        // IMPORTANT: send the complete edited object and tell the backend
+        // to replace the old claimData. This makes removed/changed fields persist.
+        const result = await updateClaim(
+          editingSubmission._id,
+          {
+            category: editCategory,
+            claimData: editClaimData,
+            replaceClaimData: true,
+          }
         );
 
-        const result =
-          await updateClaim(
-            editingSubmission._id,
-            {
-              category:
-                editCategory,
+        console.log("✅ Claim fields updated:", result);
 
-              claimData:
-                editClaimData,
-            }
-          );
+        // Upload newly selected photos/PDFs only after the claim data is saved.
+        if (editDocuments.length > 0) {
+          setUploadingEditDocuments(true);
 
-        console.log(
-          "✅ Updated claim:",
-          result
-        );
-
-        const updatedClaim =
-          result?.claim ||
-          result?.data ||
-          result;
-
-        if (
-          updatedClaim &&
-          updatedClaim._id
-        ) {
-          const normalized =
-            normalizeClaim(
-              updatedClaim
+          try {
+            const uploadResult = await uploadClaimDocuments(
+              editingSubmission._id,
+              editDocuments
             );
 
-          setSubmissions(
-            (previous) =>
-              previous.map(
-                (item) =>
-                  item.databaseId ===
-                  updatedClaim._id
-                    ? normalized
-                    : item
-              )
+            console.log("✅ Supporting documents uploaded:", uploadResult);
+          } catch (uploadError) {
+            console.error("❌ Document upload failed:", uploadError);
+            throw new Error(
+              uploadError?.response?.data?.message ||
+              uploadError?.response?.data?.error ||
+              uploadError?.message ||
+              "Claim changes were saved, but the supporting documents could not be uploaded."
+            );
+          } finally {
+            setUploadingEditDocuments(false);
+          }
+        }
+
+        // Fetch the final claim from MongoDB so the UI displays exactly what was saved.
+        const latestResult = await getClaimById(editingSubmission._id);
+        const latestClaim =
+          latestResult?.claim ||
+          latestResult?.data ||
+          latestResult;
+
+        if (latestClaim?._id) {
+          const normalized = normalizeClaim(latestClaim);
+
+          setSubmissions((previous) =>
+            previous.map((item) =>
+              item.databaseId === latestClaim._id
+                ? normalized
+                : item
+            )
           );
         }
 
-        setEditingSubmission(
-          null
-        );
-
+        setEditingSubmission(null);
         setEditCategory("");
-
         setEditClaimData({});
+        setEditDocuments([]);
+        setEditDocumentError("");
 
         showSuccess(
-          "Claim updated successfully."
+          editDocuments.length > 0
+            ? "Claim changes and supporting documents saved successfully."
+            : "Claim changes saved successfully."
         );
 
-        // Refresh from backend
         await loadSubmissions();
       } catch (err) {
-        console.error(
-          "❌ Failed to update:",
-          err
-        );
+        console.error("❌ Failed to save claim changes:", err);
 
         setEditError(
-          err?.response?.data
-            ?.message ||
-            err?.response?.data
-              ?.error ||
-            err?.message ||
-            "Unable to update claim."
+          err?.response?.data?.message ||
+          err?.response?.data?.error ||
+          err?.message ||
+          "Unable to save claim changes."
         );
       } finally {
-        setSavingEdit(
-          false
-        );
+        setUploadingEditDocuments(false);
+        setSavingEdit(false);
       }
     };
 
@@ -3420,6 +3490,93 @@ const Submissions = () => {
 
               </select>
 
+            </div>
+
+            {/* SUPPORTING DOCUMENTS */}
+
+            <div
+              style={{
+                marginBottom: "25px",
+                padding: "20px",
+                border: "1px solid #e2e8f0",
+                borderRadius: "16px",
+                background: "#ffffff",
+              }}
+            >
+              <div style={{ marginBottom: "14px" }}>
+                <h3 style={{ margin: "0 0 5px", color: "#0f172a" }}>
+                  Supporting Documents
+                </h3>
+                <p style={{ margin: 0, color: "#64748b", fontSize: "14px" }}>
+                  Add accident photos, scanned documents, or PDF files to this claim.
+                </p>
+              </div>
+
+              <label
+                htmlFor="edit-claim-documents"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "10px",
+                  minHeight: "100px",
+                  padding: "20px",
+                  border: "2px dashed #bfdbfe",
+                  borderRadius: "12px",
+                  background: "#eff6ff",
+                  color: "#2563eb",
+                  cursor: savingEdit || uploadingEditDocuments ? "not-allowed" : "pointer",
+                  textAlign: "center",
+                }}
+              >
+                <FaCloudUploadAlt style={{ fontSize: "28px" }} />
+                <span>
+                  <strong>Click to add photos or PDFs</strong><br />
+                  JPG, JPEG, PNG, WEBP or PDF • Max 10 MB each
+                </span>
+                <input
+                  id="edit-claim-documents"
+                  type="file"
+                  multiple
+                  accept="image/jpeg,image/jpg,image/png,image/webp,application/pdf,.pdf"
+                  hidden
+                  disabled={savingEdit || uploadingEditDocuments}
+                  onChange={handleEditDocumentChange}
+                />
+              </label>
+
+              {editDocumentError && (
+                <div style={{ marginTop: "12px", color: "#dc2626", fontSize: "13px", fontWeight: 600 }}>
+                  <FaExclamationTriangle style={{ marginRight: "6px" }} />
+                  {editDocumentError}
+                </div>
+              )}
+
+              {editDocuments.length > 0 && (
+                <div style={{ display: "grid", gap: "10px", marginTop: "15px" }}>
+                  {editDocuments.map((file, index) => (
+                    <div key={`${file.name}-${index}`} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px", padding: "11px 13px", border: "1px solid #e2e8f0", borderRadius: "10px", background: "#f8fafc" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: 0 }}>
+                        {file.type === "application/pdf" ? <FaFilePdf style={{ color: "#dc2626", flexShrink: 0 }} /> : <FaImage style={{ color: "#2563eb", flexShrink: 0 }} />}
+                        <div style={{ minWidth: 0 }}>
+                          <strong style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{file.name}</strong>
+                          <span style={{ color: "#64748b", fontSize: "12px" }}>{(file.size / 1024 / 1024).toFixed(2)} MB</span>
+                        </div>
+                      </div>
+                      <button type="button" onClick={() => removeEditDocument(index)} disabled={savingEdit || uploadingEditDocuments} style={{ border: "none", background: "#fee2e2", color: "#b91c1c", borderRadius: "8px", padding: "8px 10px", cursor: "pointer" }}>
+                        <FaTimes />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {uploadingEditDocuments && (
+                <div style={{ marginTop: "12px", color: "#2563eb", fontWeight: 600 }}>
+                  <FaSpinner className="fa-spin" style={{ marginRight: "7px" }} />
+                  Uploading documents...
+                </div>
+              )}
             </div>
 
             {/* FORM HEADER */}
