@@ -489,6 +489,23 @@ formSchema.pre("validate", function (next) {
 });
 
 /*
+ * Published forms must contain at least one question.
+ *
+ * Draft forms may temporarily have no questions while they
+ * are being created or edited.
+ */
+formSchema.pre("validate", function (next) {
+  if (this.status === "published" && this.questions.length === 0) {
+    this.invalidate(
+      "questions",
+      "A published form must contain at least one question."
+    );
+  }
+
+  next();
+});
+
+/*
  * Each form can have multiple versions,
  * but the same version number cannot exist twice.
  *
@@ -497,6 +514,8 @@ formSchema.pre("validate", function (next) {
  * claim-form + version 2 -> allowed
  * claim-form + version 2 -> duplicate, not allowed
  */
+
+
 formSchema.index(
   { formId: 1, version: 1 },
   { unique: true }
