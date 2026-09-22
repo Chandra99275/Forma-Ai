@@ -506,6 +506,26 @@ formSchema.pre("validate", function (next) {
 });
 
 /*
+ * Published versions must include a meaningful version note.
+ *
+ * Draft forms may be saved without a version note.
+ * Archived forms may also keep an empty version note.
+ */
+formSchema.pre("validate", function (next) {
+  if (
+    this.status === "published" &&
+    (!this.versionNote || this.versionNote.trim() === "")
+  ) {
+    this.invalidate(
+      "versionNote",
+      "Published forms must include a version note."
+    );
+  }
+
+  next();
+});
+
+/*
  * Each form can have multiple versions,
  * but the same version number cannot exist twice.
  *
