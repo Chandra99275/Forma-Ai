@@ -280,6 +280,7 @@ const formSchema = new mongoose.Schema(
     versionNote: {
       type: String,
       trim: true,
+      maxlength: [200, "Version note cannot exceed 200 characters."],
       default: "",
     },
   
