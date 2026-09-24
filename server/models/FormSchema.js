@@ -447,14 +447,19 @@ formSchema.pre("validate", function (next) {
         );
       }
 
-      if (
-        basicOperators.includes(operator) &&
-        typeof conditionValue !== "string"
-      ) {
-        this.invalidate(
-          "questions",
-          `Question "${question.id}" requires a date string as the showIf value.`
-        );
+      if (basicOperators.includes(operator)) {
+        const datePattern = /^\d{4}-\d{2}-\d{2}$/;
+        const isValidDate =
+          typeof conditionValue === "string" &&
+          datePattern.test(conditionValue) &&
+          !Number.isNaN(Date.parse(conditionValue));
+
+        if (!isValidDate) {
+          this.invalidate(
+            "questions",
+            `Question "${question.id}" requires a valid date in YYYY-MM-DD format as the showIf value.`
+          );
+        }
       }
     }
   });
