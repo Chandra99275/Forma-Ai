@@ -432,7 +432,11 @@ formSchema.pre("validate", function (next) {
 
       if (
         basicOperators.includes(operator) &&
-        !referencedQuestion.options.includes(conditionValue)
+        (typeof conditionValue !== "string" ||
+          !referencedQuestion.options.some(
+            (option) =>
+              option.trim().toLowerCase() === conditionValue.trim().toLowerCase()
+          ))
       ) {
         this.invalidate(
           "questions",
