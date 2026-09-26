@@ -85,6 +85,11 @@ const questionSchema = new mongoose.Schema(
     label: {
       type: String,
       required: true,
+      trim: true,
+      validate: {
+        validator: (value) => value.trim() !== "",
+        message: "Question label cannot be empty.",
+      },
     },
 
     type: {
