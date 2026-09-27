@@ -797,73 +797,80 @@ const DynamicForms = () => {
 
         {/* AI */}
 
-        <div
-          className={
-            applicationMode === "ai"
-              ? "modeCard activeMode"
-              : "modeCard"
-          }
-          onClick={() => setApplicationMode("ai")}
-        >
-          <FaRobot className="modeIcon" />
+       {/* ================= AI Parser ================= */}
 
-          <h3>AI Auto Fill</h3>
+<div
+  className={
+    applicationMode === "ai"
+      ? "modeCard activeMode"
+      : "modeCard"
+  }
+  onClick={() => {
+    setApplicationMode("ai");
+    navigate("/ai-parser");
+  }}
+>
+  <FaRobot className="modeIcon" />
 
-          <p>
-            Describe your accident or medical incident and let Gemini AI
-            fill the claim automatically.
-          </p>
+  <h3>AI Auto Fill</h3>
 
-          <span className="modeTag">Gemini AI</span>
+  <p>
+    Describe your accident or medical incident and let Gemini AI
+    fill the claim automatically.
+  </p>
 
-        </div>
+  <span className="modeTag">Gemini AI</span>
+</div>
 
-        {/* Image OCR */}
+{/* ================= Image Recognition ================= */}
 
-        <div
-          className={
-            applicationMode === "image"
-              ? "modeCard activeMode"
-              : "modeCard"
-          }
-          onClick={() => setApplicationMode("image")}
-        >
-          <FaCamera className="modeIcon" />
+<div
+  className={
+    applicationMode === "image"
+      ? "modeCard activeMode"
+      : "modeCard"
+  }
+  onClick={() => {
+    setApplicationMode("image");
+    navigate("/image-recognition");
+  }}
+>
+  <FaCamera className="modeIcon" />
 
-          <h3>Image OCR Upload</h3>
+  <h3>Image OCR Upload</h3>
 
-          <p>
-            Upload accident photos, RC, DL, prescriptions and bills for AI
-            extraction.
-          </p>
+  <p>
+    Upload accident photos, RC, DL, prescriptions and bills for AI
+    extraction.
+  </p>
 
-          <span className="modeTag">OCR Vision</span>
+  <span className="modeTag">OCR Vision</span>
+</div>
 
-        </div>
+{/* ================= PDF Recognition ================= */}
 
-        {/* PDF */}
+<div
+  className={
+    applicationMode === "pdf"
+      ? "modeCard activeMode"
+      : "modeCard"
+  }
+  onClick={() => {
+    setApplicationMode("pdf");
+    navigate("/pdf-recognition");
+  }}
+>
+  <FaFilePdf className="modeIcon" />
 
-        <div
-          className={
-            applicationMode === "pdf"
-              ? "modeCard activeMode"
-              : "modeCard"
-          }
-          onClick={() => setApplicationMode("pdf")}
-        >
-          <FaFilePdf className="modeIcon" />
+  <h3>PDF Upload</h3>
 
-          <h3>PDF Upload</h3>
+  <p>
+    Upload FIR, hospital bills, invoices and insurance policy
+    documents.
+  </p>
 
-          <p>
-            Upload FIR, hospital bills, invoices and insurance policy
-            documents.
-          </p>
-
-          <span className="modeTag">PDF Parser</span>
-
-        </div>
-
+  <span className="modeTag">PDF Parser</span>
+</div>
       </div>
 
     </section>
