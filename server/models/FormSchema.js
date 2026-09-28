@@ -246,6 +246,11 @@ const formSchema = new mongoose.Schema(
     title: {
       type: String,
       required: true,
+      trim: true,
+      validate: {
+        validator: (value) => value.trim() !== "",
+        message: "Form title cannot be empty.",
+      },
     },
 
     description: String,
