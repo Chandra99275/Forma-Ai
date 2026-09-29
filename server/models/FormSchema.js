@@ -241,6 +241,10 @@ const formSchema = new mongoose.Schema(
       type: String,
       required: true,
       trim: true,
+      validate: {
+        validator: (value) => value.trim() !== "",
+        message: "Form ID cannot be empty.",
+      },
     },
 
     title: {
