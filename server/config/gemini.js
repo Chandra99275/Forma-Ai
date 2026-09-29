@@ -37,7 +37,7 @@ const genAI = new GoogleGenAI({
 // from overriding the required model.
 // ==============================================
 
-export const GEMINI_MODEL = "gemini-3.6-flash";
+export const GEMINI_MODEL = "gemini-3.5-flash";
 
 // ==============================================
 // Gemini Wrapper
